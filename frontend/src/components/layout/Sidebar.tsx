@@ -1,22 +1,27 @@
 import {
-  BarChart3,
+  ChevronRight,
   FileText,
+  GitFork,
   LayoutDashboard,
+  LogOut,
   Sparkles,
   Upload,
+  User,
   X,
   Zap,
 } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
+import { useAuth } from '../../context/AuthContext'
 import { cn } from '../../lib/utils'
-import { Button } from '../ui/Button'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
-  { label: 'Upload', icon: Upload, href: '/upload' },
-  { label: 'Reports', icon: FileText, href: '/reports' },
+  { label: 'Upload Dataset', icon: Upload, href: '/upload' },
+  { label: 'Column Mapping', icon: GitFork, href: '/mapping' },
+  { label: 'Intelligence Reports', icon: FileText, href: '/reports' },
   { label: 'AI Analyst', icon: Sparkles, href: '/ai-analyst' },
+  { label: 'Executive Profile', icon: User, href: '/profile' },
 ]
 
 interface SidebarProps {
@@ -26,6 +31,22 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+
+  const userInitials = user?.name
+    ? user.name
+        .split(' ')
+        .map(w => w[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : 'U'
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   const sidebarContent = (
     <>
@@ -35,8 +56,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
             <Zap className="h-4 w-4 text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white">Back-Office</p>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400">
+            <p className="text-sm font-bold tracking-tight text-white">Back-Office</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-brand-400">
               AI Copilot
             </p>
           </div>
@@ -53,9 +74,9 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
         )}
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 p-4">
-        <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
-          Navigation
+      <nav className="flex flex-1 flex-col gap-1.5 p-4">
+        <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+          Core Platform
         </p>
         {navItems.map(({ label, icon: Icon, href }) => {
           const isActive =
@@ -65,44 +86,60 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
             <Link key={label} to={href} onClick={onMobileClose}>
               <div
                 className={cn(
-                  'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                  'group flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200',
                   isActive
                     ? 'gradient-brand text-white shadow-md shadow-brand-500/25'
                     : 'text-slate-400 hover:bg-white/8 hover:text-white',
                 )}
               >
-                <Icon
-                  className={cn(
-                    'h-4 w-4 shrink-0 transition-transform duration-200',
-                    !isActive && 'group-hover:scale-110',
-                  )}
-                />
-                {label}
+                <div className="flex items-center gap-3">
+                  <Icon
+                    className={cn(
+                      'h-4 w-4 shrink-0 transition-transform duration-200',
+                      !isActive && 'group-hover:scale-110',
+                    )}
+                  />
+                  <span>{label}</span>
+                </div>
+                {isActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                )}
               </div>
             </Link>
           )
         })}
       </nav>
 
-      <div className="border-t border-white/10 p-4">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
-            <BarChart3 className="h-4 w-4 text-brand-400" />
-            System Status
+      {/* User profile footer with real user data */}
+      <div className="border-t border-white/10 p-3">
+        <Link
+          to="/profile"
+          onClick={onMobileClose}
+          className="group flex items-center gap-3 rounded-2xl border border-white/5 bg-white/5 p-2.5 transition-all duration-200 hover:border-brand-500/30 hover:bg-white/10"
+        >
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-violet-500 font-bold text-white shadow-md shadow-brand-500/25 text-xs">
+            <span>{userInitials}</span>
+            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-900 bg-emerald-500" />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse-soft" />
-            <p className="text-xs text-slate-400">Phase 1 — Foundation active</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between">
+              <p className="truncate text-xs font-bold text-white group-hover:text-brand-300">
+                {user?.name || 'User'}
+              </p>
+              <ChevronRight className="h-3.5 w-3.5 text-slate-400 opacity-60 transition-all group-hover:opacity-100 group-hover:translate-x-0.5" />
+            </div>
+            <p className="truncate text-[11px] text-slate-400">{user?.title || 'Analyst'}</p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-3 w-full border-white/20 bg-white/5 text-white hover:bg-white/10"
-            type="button"
-          >
-            View changelog
-          </Button>
-        </div>
+        </Link>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold text-slate-500 transition-all hover:bg-red-500/10 hover:text-red-400"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          <span>Sign Out</span>
+        </button>
       </div>
     </>
   )

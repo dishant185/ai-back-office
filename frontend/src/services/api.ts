@@ -1,10 +1,11 @@
 import axios from 'axios'
 
 import type { HealthResponse } from '../types/api'
+import type { AnalyticsResponse } from '../types/analytics'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
-  timeout: 10000,
+  baseURL: import.meta.env.VITE_API_URL || '',
+  timeout: 120000,
 })
 
 export const healthService = {
@@ -14,4 +15,16 @@ export const healthService = {
   },
 }
 
+export const analyticsService = {
+  runAnalytics: async (datasetId: string): Promise<AnalyticsResponse> => {
+    const response = await api.post<AnalyticsResponse>('/api/v1/analytics/run', {
+      dataset_id: datasetId,
+    })
+    return response.data
+  },
+}
+
+export { reportService } from './reportService'
+
 export default api
+

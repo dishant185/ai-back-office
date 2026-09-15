@@ -1,10 +1,24 @@
-import { Bell, Menu, Search, User } from 'lucide-react'
+import { Bell, Menu, Search } from 'lucide-react'
+import { Link } from 'react-router-dom'
+
+import { useAuth } from '../../context/AuthContext'
 
 interface HeaderProps {
   onMenuClick?: () => void
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
+  const { user } = useAuth()
+
+  const userInitials = user?.name
+    ? user.name
+        .split(' ')
+        .map(w => w[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : 'U'
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 glass px-4 sm:px-6">
       <div className="flex items-center gap-3">
@@ -20,7 +34,9 @@ export function Header({ onMenuClick }: HeaderProps) {
           <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">
             Operations
           </p>
-          <p className="text-sm font-medium text-slate-700">Overview</p>
+          <p className="text-sm font-medium text-slate-700">
+            Welcome, {user?.name?.split(' ')[0] || 'User'}
+          </p>
         </div>
       </div>
 
@@ -45,13 +61,14 @@ export function Header({ onMenuClick }: HeaderProps) {
           </span>
         </button>
 
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-xl gradient-brand text-white shadow-md shadow-brand-500/25 transition hover:brightness-110"
+        <Link
+          to="/profile"
+          className="flex h-9 w-9 items-center justify-center rounded-xl gradient-brand text-white shadow-md shadow-brand-500/25 transition hover:brightness-110 active:scale-95 text-[11px] font-bold"
           aria-label="User profile"
+          title={user?.name || 'Profile'}
         >
-          <User className="h-4 w-4" />
-        </button>
+          {userInitials}
+        </Link>
       </div>
     </header>
   )

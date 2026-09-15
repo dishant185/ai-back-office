@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { cn } from '../../lib/utils'
 
 type ButtonVariant = 'default' | 'secondary' | 'ghost' | 'outline' | 'danger'
-type ButtonSize = 'default' | 'sm' | 'lg' | 'icon'
+type ButtonSize = 'default' | 'sm' | 'md' | 'lg' | 'icon'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
@@ -32,6 +32,7 @@ export function Button({
 
   const sizeClasses: Record<ButtonSize, string> = {
     default: 'h-10 px-4 py-2 text-sm',
+    md: 'h-10 px-4 py-2 text-sm',
     sm: 'h-8 px-3 text-xs',
     lg: 'h-11 px-6 text-sm',
     icon: 'h-9 w-9 p-0',
