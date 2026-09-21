@@ -2,14 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlertCircle,
-  ArrowLeft,
   ArrowRight,
   Calendar,
   CheckCircle2,
   ChevronLeft,
   Database,
   Eye,
-  FileSpreadsheet,
   FileText,
   GitFork,
   Layers,
@@ -18,13 +16,16 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
-  Sparkles,
+  Trash2,
   Zap,
 } from 'lucide-react'
 
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardHeader } from '../components/ui/Card'
+import { CardSkeleton } from '../components/ui/Skeleton'
+import { EmptyState } from '../components/ui/EmptyState'
+import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import { PageHeader } from '../components/ui/PageHeader'
 import type { MappingSuggestion, MappingValidationResult, StandardizedDataset } from '../types/mapping'
 import api from '../services/api'
@@ -100,12 +101,6 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
-function formatFileSize(bytes: number): string {
-  if (!bytes || bytes === 0) return '0 B'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 export default function MappingPage() {
   const navigate = useNavigate()
@@ -115,6 +110,9 @@ export default function MappingPage() {
   const [mappingsList, setMappingsList] = useState<MappingListItem[]>([])
   const [listLoading, setListLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<MappingListItem | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // ── Editor mode state ──
   const [rows, setRows] = useState<MappingRowState[]>([])
@@ -122,6 +120,7 @@ export default function MappingPage() {
   const [validationMessage, setValidationMessage] = useState('')
   const [validationStatus, setValidationStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [standardizedData, setStandardizedData] = useState<StandardizedDataset | null>(null)
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false)
   const [uploadId, setUploadId] = useState<string | null>(routeUploadId ?? null)
   const [isApplying, setIsApplying] = useState(false)
   const [activeFilter, setActiveFilter] = useState<'all' | 'mapped' | 'review' | 'ignored'>('all')
@@ -147,6 +146,22 @@ export default function MappingPage() {
       setMappingsList([])
     } finally {
       setListLoading(false)
+    }
+  }
+
+  // ── Delete dataset handler ──
+  const handleDeleteDataset = async () => {
+    if (!deleteTarget) return
+    try {
+      setIsDeleting(true)
+      setDeleteError(null)
+      await api.delete(`/api/v1/datasets/${deleteTarget.upload_id}`)
+      setDeleteTarget(null)
+      await fetchMappingsList()
+    } catch (err: any) {
+      setDeleteError(err?.response?.data?.detail || 'Failed to delete dataset')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -176,23 +191,70 @@ export default function MappingPage() {
       setUploadId(routeUploadId)
       setEditorMode(true)
     } else {
-      // Check if there's a recent upload in session
-      const stored = sessionStorage.getItem('ai_backoffice_latest_upload')
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored) as { uploadId?: string }
-          if (parsed.uploadId) {
-            setUploadId(parsed.uploadId)
-            setEditorMode(true)
-          }
-        } catch {
-          // fall through to list view
-        }
-      }
+      // When navigating to /mapping, show all mapping cards
+      setUploadId(null)
+      setEditorMode(false)
     }
 
     void fetchMappingsList()
   }, [routeUploadId])
+
+  // ── Auto-generate or fetch standardized preview ──
+  const loadStandardizedPreview = async (targetUploadId?: string, targetRows?: MappingRowState[]) => {
+    const id = targetUploadId || uploadId
+    const activeRows = targetRows || rows
+    if (!id || !activeRows.length) return
+
+    setIsPreviewLoading(true)
+    try {
+      const payload = {
+        mappings: activeRows.map((row) => ({
+          source: row.source,
+          target: row.target || undefined,
+          ignored: row.ignored,
+          confidence: row.confidence,
+          status: row.status,
+          reason: row.reason,
+          method: 'manual',
+          user_confirmed: Boolean(row.target),
+        })),
+        upload_id: id,
+      }
+
+      const response = await api.post<{
+        success: boolean
+        row_count?: number
+        column_count?: number
+        columns?: string[]
+        preview?: Array<Record<string, unknown>>
+        standardized?: {
+          rows: Array<Record<string, unknown>>
+          columns: string[]
+        }
+      }>('/api/v1/mappings/apply', payload)
+
+      if (response.data.success) {
+        const standardized = response.data.standardized ?? {
+          rows: response.data.preview ?? [],
+          columns: response.data.columns ?? [],
+        }
+
+        const nextStandardized: StandardizedDataset = {
+          success: true,
+          rows: standardized.rows,
+          columns: standardized.columns,
+          row_count: response.data.row_count ?? standardized.rows.length,
+          column_count: response.data.column_count ?? standardized.columns.length,
+        }
+
+        setStandardizedData(nextStandardized)
+      }
+    } catch (err) {
+      console.warn('Preview generation error:', err)
+    } finally {
+      setIsPreviewLoading(false)
+    }
+  }
 
   // ── Load mapping suggestions when editor opens ──
   useEffect(() => {
@@ -204,11 +266,26 @@ export default function MappingPage() {
         setValidationMessage('')
         setValidationStatus('idle')
 
-        const stored = sessionStorage.getItem('ai_backoffice_latest_upload')
-        const storedPayload = stored ? JSON.parse(stored) as { dataset?: { preview?: Array<Record<string, unknown>> } } : null
-        const columns = storedPayload?.dataset?.preview && storedPayload.dataset.preview.length > 0
-          ? Object.keys(storedPayload.dataset.preview[0])
-          : []
+        let columns: string[] = []
+
+        // 1. Fetch column schema for this specific dataset
+        try {
+          const schemaResp = await api.get(`/api/v1/datasets/${uploadId}/schema`)
+          if (schemaResp.data?.columns && Array.isArray(schemaResp.data.columns)) {
+            columns = schemaResp.data.columns.map((c: any) => c.original_name || c.name)
+          }
+        } catch {
+          // fallback
+        }
+
+        // 2. Fallback to session storage if applicable
+        if (!columns.length) {
+          const stored = sessionStorage.getItem('ai_backoffice_latest_upload')
+          const storedPayload = stored ? (JSON.parse(stored) as { dataset?: { preview?: Array<Record<string, unknown>> } }) : null
+          if (storedPayload?.dataset?.preview && storedPayload.dataset.preview.length > 0) {
+            columns = Object.keys(storedPayload.dataset.preview[0])
+          }
+        }
 
         if (!columns.length) {
           setValidationStatus('error')
@@ -217,6 +294,18 @@ export default function MappingPage() {
           return
         }
 
+        // 3. Check for existing saved mappings for this dataset
+        let savedMappings: Array<{ source: string; target: string; ignored?: boolean; confidence?: number; status?: string; reason?: string }> = []
+        try {
+          const savedResp = await api.get(`/api/v1/mappings/${uploadId}`)
+          if (savedResp.data?.mappings && Array.isArray(savedResp.data.mappings) && savedResp.data.mappings.length > 0) {
+            savedMappings = savedResp.data.mappings
+          }
+        } catch {
+          // proceed with fresh suggestions
+        }
+
+        // 4. Request mapping suggestions
         const response = await api.post<{ success: boolean; columns: MappingSuggestion[] }>(
           '/api/v1/mappings/suggest',
           { columns, dataset_id: uploadId },
@@ -226,18 +315,23 @@ export default function MappingPage() {
           throw new Error('No mapping suggestions returned.')
         }
 
-        const nextRows = response.data.columns.map((item) => ({
-          source: item.source,
-          target: item.suggested_target ?? '',
-          ignored: false,
-          confidence: Number(item.confidence ?? 0),
-          status: item.status ?? 'needs_review',
-          reason: item.reason ?? 'Automated recommendation',
-          normalized: item.normalized ?? item.source,
-        }))
+        const savedMap = new Map(savedMappings.map((m) => [m.source, m]))
+        const nextRows = response.data.columns.map((item) => {
+          const saved = savedMap.get(item.source)
+          return {
+            source: item.source,
+            target: saved ? saved.target : (item.suggested_target ?? ''),
+            ignored: saved ? Boolean(saved.ignored) : false,
+            confidence: saved?.confidence ? Number(saved.confidence) : Number(item.confidence ?? 0),
+            status: saved?.status ?? (item.status ?? 'needs_review'),
+            reason: saved?.reason ?? (item.reason ?? 'Automated recommendation'),
+            normalized: item.normalized ?? item.source,
+          }
+        })
 
         setRows(nextRows)
         setLoading(false)
+        void loadStandardizedPreview(uploadId, nextRows)
       } catch (requestError: any) {
         setValidationStatus('error')
         setValidationMessage(requestError?.message || 'Unable to generate column mappings.')
@@ -561,16 +655,21 @@ export default function MappingPage() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('preview')}
-              disabled={!standardizedData}
+              onClick={() => {
+                setActiveTab('preview')
+                if (!standardizedData && !isPreviewLoading) {
+                  void loadStandardizedPreview()
+                }
+              }}
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
                 activeTab === 'preview'
                   ? 'bg-brand-50 text-brand-700 border border-brand-200 shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed'
+                  : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               <Eye className="h-4 w-4" />
               Standardized Output Preview {standardizedData ? `(${standardizedData.row_count} rows)` : ''}
+              {isPreviewLoading && <Loader2 className="h-3 w-3 animate-spin text-brand-600 ml-1" />}
             </button>
           </div>
 
@@ -769,66 +868,129 @@ export default function MappingPage() {
         )}
 
         {/* Tab Content 2: Standardized Preview */}
-        {activeTab === 'preview' && standardizedData && (
-          <Card className="border-slate-200/80 shadow-sm overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between pb-4">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Standardized Schema Output</h2>
-                <p className="text-xs text-slate-500">
-                  {standardizedData.row_count} records standardized across {standardizedData.column_count} canonical fields.
-                </p>
+        {activeTab === 'preview' && (
+          isPreviewLoading && !standardizedData ? (
+            <Card className="border-slate-200/80 shadow-sm p-12 text-center bg-white">
+              <div className="flex flex-col items-center justify-center space-y-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Generating Standardized Output Preview...</h3>
+                  <p className="text-xs text-slate-500 mt-1">Applying schema harmonization rules across dataset records.</p>
+                </div>
               </div>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => navigate(`/reports?datasetId=${uploadId}`)}
-                className="bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md shadow-brand-500/25"
-              >
-                <FileText className="mr-1.5 h-4 w-4" />
-                Generate Executive Report
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-100/70">
-                      <th className="px-4 py-3 font-bold uppercase tracking-wider text-slate-500">#</th>
-                      {standardizedData.columns.map((col) => (
-                        <th key={col} className="px-4 py-3 font-bold uppercase tracking-wider text-slate-700 whitespace-nowrap">
-                          {col}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {standardizedData.rows.slice(0, 10).map((row, idx) => (
-                      <tr key={idx} className="border-b border-slate-100 odd:bg-white even:bg-slate-50/50 hover:bg-brand-50/30 transition">
-                        <td className="px-4 py-2.5 text-slate-400 font-mono">{idx + 1}</td>
+            </Card>
+          ) : standardizedData ? (
+            <Card className="border-slate-200/80 shadow-sm overflow-hidden bg-white">
+              <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100 bg-slate-50/50">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-slate-900">Standardized Schema Output</h2>
+                    <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200">
+                      Harmonized Preview
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {standardizedData.row_count} records standardized across {standardizedData.column_count} canonical fields.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void loadStandardizedPreview()}
+                    disabled={isPreviewLoading}
+                    className="text-xs"
+                  >
+                    <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isPreviewLoading ? 'animate-spin' : ''}`} />
+                    Refresh Preview
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => navigate(`/reports?datasetId=${uploadId}`)}
+                    className="bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md shadow-brand-500/25 text-xs"
+                  >
+                    <FileText className="mr-1.5 h-4 w-4" />
+                    Generate Executive Report
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-100/70">
+                        <th className="px-4 py-3 font-bold uppercase tracking-wider text-slate-500">#</th>
                         {standardizedData.columns.map((col) => (
-                          <td key={col} className="px-4 py-2.5 text-slate-700 whitespace-nowrap">
-                            {String(row[col] ?? '—')}
-                          </td>
+                          <th key={col} className="px-4 py-3 font-bold uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                            {col}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {standardizedData.rows.slice(0, 10).map((row, idx) => (
+                        <tr key={idx} className="border-b border-slate-100 odd:bg-white even:bg-slate-50/50 hover:bg-brand-50/30 transition">
+                          <td className="px-4 py-2.5 text-slate-400 font-mono">{idx + 1}</td>
+                          {standardizedData.columns.map((col) => (
+                            <td key={col} className="px-4 py-2.5 text-slate-700 whitespace-nowrap">
+                              {String(row[col] ?? '—')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-              <div className="border-t border-slate-100 p-4 bg-slate-50/60 flex items-center justify-between">
-                <span className="text-xs text-slate-500">Showing first 10 rows for verification</span>
+                <div className="border-t border-slate-100 p-4 bg-slate-50/60 flex items-center justify-between">
+                  <span className="text-xs text-slate-500">Showing first 10 rows for verification</span>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setActiveTab('mapping')}
+                    >
+                      <ChevronLeft className="mr-1.5 h-4 w-4" />
+                      Back to Column Matcher
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => navigate(`/reports?datasetId=${uploadId}`)}
+                      className="bg-brand-600 hover:bg-brand-700 text-white font-bold"
+                    >
+                      Generate Executive Report
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-slate-200/80 shadow-sm p-12 text-center bg-white">
+              <div className="flex flex-col items-center justify-center space-y-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Standardized Preview Not Ready</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                    Harmonize and preview your dataset records using the configured column rules.
+                  </p>
+                </div>
                 <Button
-                  size="md"
-                  onClick={() => navigate(`/reports?datasetId=${uploadId}`)}
-                  className="bg-brand-600 hover:bg-brand-700 text-white font-bold"
+                  size="sm"
+                  onClick={() => void loadStandardizedPreview()}
+                  className="bg-brand-600 hover:bg-brand-700 text-white font-bold mt-2"
                 >
-                  Generate Executive Report
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  <Eye className="mr-1.5 h-4 w-4" />
+                  Generate Preview Now
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </Card>
+          )
         )}
       </div>
     )
@@ -838,7 +1000,8 @@ export default function MappingPage() {
   // ► LIST VIEW — Browse all saved mappings
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
+    <ErrorBoundary fallbackTitle="Column Mapping Studio">
+      <div className="space-y-8 animate-fade-in pb-12">
       {/* Top Header */}
       <PageHeader
         eyebrow="Schema Harmonization Studio"
@@ -910,8 +1073,8 @@ export default function MappingPage() {
       {/* Loading state */}
       {listLoading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-52 rounded-2xl border border-slate-200 bg-slate-50 animate-pulse" />
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <CardSkeleton key={i} lines={3} />
           ))}
         </div>
       )}
@@ -932,20 +1095,33 @@ export default function MappingPage() {
                 <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-indigo-500/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100 blur-2xl" />
 
                 <div className="relative z-10 space-y-4">
-                  {/* Icon + badge */}
+                  {/* Icon + badge + delete action */}
                   <div className="flex items-center justify-between">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition-transform duration-200 group-hover:scale-110">
                       <GitFork className="h-5 w-5" />
                     </div>
-                    <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${
-                      mappedPct >= 80
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                        : mappedPct >= 50
-                          ? 'border-amber-200 bg-amber-50 text-amber-700'
-                          : 'border-slate-200 bg-slate-50 text-slate-600'
-                    }`}>
-                      {mappedPct}% Mapped
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${
+                        mappedPct >= 80
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : mappedPct >= 50
+                            ? 'border-amber-200 bg-amber-50 text-amber-700'
+                            : 'border-slate-200 bg-slate-50 text-slate-600'
+                      }`}>
+                        {mappedPct}% Mapped
+                      </span>
+                      <button
+                        type="button"
+                        title="Delete dataset"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setDeleteTarget(m)
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Filename */}
@@ -1001,43 +1177,79 @@ export default function MappingPage() {
 
       {/* Empty State */}
       {!listLoading && mappingsList.length === 0 && (
-        <Card className="overflow-hidden border-slate-200/80 shadow-sm">
-          <div className="relative px-6 py-20 text-center sm:px-12 sm:py-24">
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-indigo-50/40 to-transparent" />
-            <div className="relative max-w-md mx-auto space-y-5">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-indigo-50 text-indigo-600 shadow-sm border border-indigo-100">
-                <GitFork className="h-10 w-10" />
-              </div>
-              <div className="space-y-1.5">
-                <h2 className="text-2xl font-black text-slate-900 tracking-tight">No Column Mappings Yet</h2>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Upload a CSV or Excel dataset first, then configure column mappings to harmonize your data
-                  for deterministic intelligence reporting.
-                </p>
-              </div>
-              <div className="pt-2 flex items-center justify-center">
-                <Button
-                  size="lg"
-                  onClick={() => navigate('/upload')}
-                  className="bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md shadow-brand-500/25"
-                >
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  Upload Dataset to Map
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Card>
+        <EmptyState
+          icon={GitFork}
+          title="No Column Mappings Yet"
+          description="Upload a CSV or Excel dataset first, then configure column mappings to harmonize your data for deterministic intelligence reporting."
+          actionLabel="Upload Dataset to Map"
+          onAction={() => navigate('/upload')}
+        />
       )}
 
       {/* No search results */}
       {!listLoading && mappingsList.length > 0 && filteredMappings.length === 0 && searchQuery && (
-        <div className="text-center py-12">
-          <Search className="h-8 w-8 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-sm font-bold text-slate-700">No mappings matching "{searchQuery}"</h3>
-          <p className="text-xs text-slate-500 mt-1">Try a different search term or clear the filter.</p>
+        <EmptyState
+          icon={Search}
+          title="No Mappings Found"
+          description={`No column mappings matched "${searchQuery}". Try a different search term or clear the filter.`}
+          actionLabel="Clear Search"
+          onAction={() => setSearchQuery('')}
+        />
+      )}
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Delete Dataset</h3>
+                <p className="text-xs text-slate-500">This action cannot be undone.</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Are you sure you want to delete <strong className="text-slate-900">{deleteTarget.filename || deleteTarget.upload_id}</strong>? All mapped dimensions, cached profiles, and associated intelligence will be permanently removed.
+            </p>
+            {deleteError && (
+              <div className="p-2.5 rounded-lg bg-red-50 text-red-700 text-xs font-medium">
+                {deleteError}
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={isDeleting}
+                onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                disabled={isDeleting}
+                onClick={handleDeleteDataset}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Delete Dataset
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   )
 }

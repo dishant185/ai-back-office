@@ -48,20 +48,46 @@ class MappingService:
                 "audit": {"status": "missing_upload_id", "errors": ["Upload reference is missing."]},
             }
 
+        doc = None
         source_path = Path(settings.upload_dir) / upload_id
         if not source_path.exists():
-            return {
-                "success": False,
-                "row_count": 0,
-                "column_count": 0,
-                "columns": [],
-                "preview": [],
-                "mapping_summary": {"original_columns": 0, "standardized_fields": 0, "mapped": 0, "unmapped": 0, "conflicts": 0},
-                "standardized": {"rows": [], "columns": []},
-                "audit": {"status": "not_found", "errors": [f"Dataset {upload_id} was not found."]},
-            }
+            from app.db.repositories.dataset_repository import DatasetRepository
+            doc = DatasetRepository().get_by_id(upload_id)
+            if doc and (doc.get("file_path") or doc.get("saved_path")):
+                p = Path(doc.get("file_path") or doc.get("saved_path"))
+                if p.exists():
+                    source_path = p
 
-        dataframe = DataLoader().load_file(source_path)
+            if not source_path.exists():
+                for d in [Path("data/uploads"), Path("../data/uploads")]:
+                    if d.exists():
+                        for f in d.glob("*.*"):
+                            if upload_id in f.name:
+                                source_path = f
+                                break
+                        if source_path.exists():
+                            break
+
+        if not source_path.exists():
+            if not doc:
+                from app.db.repositories.dataset_repository import DatasetRepository
+                doc = DatasetRepository().get_by_id(upload_id)
+            if doc and doc.get("summary", {}).get("preview"):
+                dataframe = pd.DataFrame(doc["summary"]["preview"])
+            else:
+                return {
+                    "success": False,
+                    "row_count": 0,
+                    "column_count": 0,
+                    "columns": [],
+                    "preview": [],
+                    "mapping_summary": {"original_columns": 0, "standardized_fields": 0, "mapped": 0, "unmapped": 0, "conflicts": 0},
+                    "standardized": {"rows": [], "columns": []},
+                    "audit": {"status": "not_found", "errors": [f"Dataset {upload_id} was not found."]},
+                }
+        else:
+            dataframe = DataLoader().load_file(source_path)
+
         rename_map = {
             str(item.get("source")): str(item.get("target"))
             for item in mappings

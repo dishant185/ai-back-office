@@ -16,9 +16,9 @@ def build_metrics(frame: pd.DataFrame, profile: str) -> list[Metric]:
     metrics: list[Metric] = []
 
     if profile == "sales":
-        revenue = _safe_numeric(frame.get("revenue", pd.Series(dtype="float64")))
-        quantity = _safe_numeric(frame.get("quantity", pd.Series(dtype="float64")))
-        profit = _safe_numeric(frame.get("profit", pd.Series(dtype="float64")))
+        revenue = resolve_numeric_field(frame, "revenue")
+        quantity = resolve_numeric_field(frame, "quantity")
+        profit = resolve_numeric_field(frame, "profit")
         metrics.extend(
             [
                 Metric(name="total_revenue", value=float(revenue.sum()) if not revenue.empty else 0.0, unit="currency", description="Total revenue"),

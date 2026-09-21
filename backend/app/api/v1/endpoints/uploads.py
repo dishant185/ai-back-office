@@ -48,11 +48,70 @@ async def upload_file(
     insights = payload["insights"]
     audit = payload["audit"]
 
+    account_id = str(current_user.get("account_id")) if current_user and current_user.get("account_id") else "account_default"
     user_id = str(current_user.get("id")) if current_user else "guest"
     user_email = str(current_user.get("email")) if current_user else "guest"
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-    # Persist dataset record in MongoDB user-wise
+    # 1. Persist in MongoDB datasets repository
+    try:
+        from app.data.loader import DataLoader
+        from app.data.semantic.schema_builder import build_semantic_schema
+        from app.data.semantic.capability_detector import discover_capabilities
+        from app.data.knowledge.builder import build_dataset_knowledge
+        from app.data.knowledge.registry import KnowledgeRegistry
+        from app.db.repositories.dataset_repository import DatasetRepository
+        from app.db.repositories.schema_repository import SchemaRepository
+        from app.db.repositories.knowledge_repository import KnowledgeRepository
+
+        df = DataLoader().load_file(saved_path)
+        schema = build_semantic_schema(df)
+        caps = discover_capabilities(schema)
+        knowledge_pkg = build_dataset_knowledge(
+            dataset_id=saved_name,
+            account_id=account_id,
+            file_name=file.filename,
+            frame=df,
+            schema=schema,
+            capabilities=caps,
+        )
+
+        DatasetRepository().create_dataset(
+            account_id=account_id,
+            user_id=user_id,
+            file_name=file.filename,
+            file_type=file.filename.rsplit(".", 1)[-1].lower(),
+            file_size=size,
+            file_path=str(saved_path),
+            profile=schema.profile,
+            row_count=len(df),
+            column_count=len(df.columns),
+            dataset_id=saved_name,
+            summary=summary,
+            validation=validation,
+            capabilities=caps,
+        )
+
+        SchemaRepository().save_schema(saved_name, account_id, schema.model_dump())
+        KnowledgeRepository().save_knowledge(knowledge_pkg.model_dump())
+        KnowledgeRegistry.register(knowledge_pkg)
+
+        from app.ai.dataset.knowledge_builder import DatasetKnowledgeBuilder
+        from app.ai.dataset.knowledge_repository import DatasetKnowledgeRepository
+        ds_knowledge = DatasetKnowledgeBuilder.build_knowledge(
+            df=df,
+            dataset_id=saved_name,
+            file_name=file.filename,
+            account_id=account_id,
+            tenant_id=account_id,
+        )
+        DatasetKnowledgeRepository().save_knowledge(ds_knowledge.model_dump())
+
+    except Exception as err:
+        import logging
+        logging.getLogger(__name__).warning("Error generating semantic knowledge or persisting in MongoDB: %s", err)
+
+    # 2. Legacy uploads collection fallback
     try:
         uploads_col = get_uploads_collection()
         uploads_col.update_one(
@@ -60,6 +119,7 @@ async def upload_file(
             {
                 "$set": {
                     "upload_id": saved_name,
+                    "account_id": account_id,
                     "user_id": user_id,
                     "user_email": user_email,
                     "filename": file.filename,
@@ -74,7 +134,7 @@ async def upload_file(
         )
     except Exception as err:
         import logging
-        logging.getLogger(__name__).warning("Could not persist upload in MongoDB: %s", err)
+        logging.getLogger(__name__).warning("Could not persist upload in legacy collection: %s", err)
 
     return UploadResponse(
         success=True,
@@ -111,3 +171,13 @@ def list_user_uploads(
             "created_at": doc.get("created_at"),
         })
     return results
+
+
+@router.delete("/uploads/{upload_id}")
+def delete_upload_alias(
+    upload_id: str,
+    current_user: dict[str, Any] | None = Depends(get_optional_user),
+) -> dict[str, Any]:
+    """Delete upload (API v1 /uploads/{upload_id} alias)."""
+    from app.api.v1.endpoints.datasets import delete_dataset
+    return delete_dataset(dataset_id=upload_id, current_user=current_user)

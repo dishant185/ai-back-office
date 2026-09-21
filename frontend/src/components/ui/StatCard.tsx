@@ -22,35 +22,33 @@ export function StatCard({
   className,
 }: StatCardProps) {
   return (
-    <Card hover className={cn('overflow-hidden', className)}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              {label}
-            </p>
-            <p className="text-2xl font-bold tracking-tight text-slate-900">{value}</p>
-            {trend && (
-              <p
-                className={cn(
-                  'text-xs font-medium',
-                  trend.positive ? 'text-emerald-600' : 'text-slate-500',
-                )}
-              >
-                {trend.value}
-              </p>
-            )}
-          </div>
-          <div
+    <div className={cn('border-b border-novera-rule pb-3 space-y-1.5 bg-novera-paper-sheet p-3.5 rounded-[2px] border border-novera-rule', className)}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-novera-muted">{label}</span>
+        <div
+          className={cn(
+            'flex h-6 w-6 shrink-0 items-center justify-center rounded-[2px] bg-novera-paper-sunken text-novera-secondary',
+            iconClassName,
+          )}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono tabular-nums text-2xl font-bold tracking-tight text-novera-ink">
+          {value}
+        </span>
+        {trend && (
+          <span
             className={cn(
-              'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600',
-              iconClassName,
+              'font-mono text-xs font-semibold',
+              trend.positive ? 'text-novera-green' : 'text-novera-flag',
             )}
           >
-            <Icon className="h-5 w-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+            {trend.value}
+          </span>
+        )}
+      </div>
+    </div>
   )
 }

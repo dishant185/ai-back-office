@@ -62,3 +62,8 @@ class DataLoader:
         if missing_ratio > 0.1:
             return "review"
         return "good"
+
+
+def load_tabular_file(file_path: str | Path) -> pd.DataFrame:
+    """Convenience helper to load tabular CSV or Excel file."""
+    return DataLoader().load_file(file_path)

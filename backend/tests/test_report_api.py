@@ -61,3 +61,16 @@ def test_reports_api_generate_and_get() -> None:
     assert list_res.status_code == 200
     list_data = list_res.json()
     assert any(r["report_id"] == report_id for r in list_data)
+
+    # 4. Call POST /api/v1/reports/{report_id}/ai-summary (Version 7.0)
+    ai_res = client.post(f"/api/v1/reports/{report_id}/ai-summary", json={"regenerate": True})
+    assert ai_res.status_code == 200
+    ai_data = ai_res.json()
+    assert ai_data["status"].lower() in (
+        "verified", "verified_analytics_only", "requires_verification",
+        "ai_generated_grounded", "ai_validation_failed", "ai_not_configured",
+    )
+    assert "validation" in ai_data
+    assert "report_title" in ai_data["summary"]
+    assert "overview" in ai_data["summary"]
+    assert len(ai_data["summary"]["overview"]) >= 30

@@ -9,23 +9,24 @@ interface PageHeaderProps {
 
 export function PageHeader({ eyebrow, title, description, actions }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div className="space-y-1.5 animate-slide-up">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-novera-rule pb-5">
+      <div className="space-y-1">
         {eyebrow && (
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600">
-            {eyebrow}
-          </p>
+          <div className="flex items-center gap-1.5 text-xs font-mono text-novera-muted">
+            <span className="h-1.5 w-1.5 rounded-[1px] bg-novera-green" />
+            <span>{eyebrow}</span>
+          </div>
         )}
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+        <h1 className="text-xl font-bold tracking-tight text-novera-ink sm:text-2xl font-sans">
           {title}
         </h1>
         {description && (
-          <p className="max-w-2xl text-sm leading-relaxed text-slate-500 sm:text-base">
+          <p className="max-w-3xl text-xs sm:text-sm leading-relaxed text-novera-secondary">
             {description}
           </p>
         )}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex shrink-0 items-center gap-2 pt-1">{actions}</div>}
     </div>
   )
 }

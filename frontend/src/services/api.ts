@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-import type { HealthResponse } from '../types/api'
+import type { HealthResponse, ReadinessResponse } from '../types/api'
 import type { AnalyticsResponse } from '../types/analytics'
 
 const api = axios.create({
@@ -11,6 +11,10 @@ const api = axios.create({
 export const healthService = {
   getHealth: async (): Promise<HealthResponse> => {
     const response = await api.get<HealthResponse>('/health')
+    return response.data
+  },
+  getReadiness: async (): Promise<ReadinessResponse> => {
+    const response = await api.get<ReadinessResponse>('/readiness')
     return response.data
   },
 }

@@ -4,6 +4,9 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
+import { ToastProvider } from './context/ToastContext'
+import { EvidenceProvider } from './context/EvidenceContext'
 import AIAnalyst from './pages/AIAnalyst'
 import Auth from './pages/Auth'
 import Dashboard from './pages/Dashboard'
@@ -12,27 +15,37 @@ import Profile from './pages/Profile'
 import Reports from './pages/Reports'
 import UploadPage from './pages/Upload'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+})
+
+function LoadingScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-novera-ink text-slate-100 font-sans">
+      <div className="flex flex-col items-center gap-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-[2px] bg-novera-deep border border-white/20 font-mono text-base font-bold text-novera-green-light">
+          N
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-3 w-3 animate-spin border-2 border-novera-green/30 border-t-novera-green rounded-full" />
+          <p className="text-xs font-mono text-novera-muted tracking-tight">Initializing Novera Ledger...</p>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: '#0a0e1a' }}>
-        <div className="flex flex-col items-center gap-4">
-          <div style={{
-            width: 40,
-            height: 40,
-            border: '3px solid rgba(99, 102, 241, 0.2)',
-            borderTopColor: '#6366f1',
-            borderRadius: '50%',
-            animation: 'authSpin 0.6s linear infinite',
-          }} />
-          <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   if (!isAuthenticated) {
@@ -46,18 +59,7 @@ function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: '#0a0e1a' }}>
-        <div style={{
-          width: 40,
-          height: 40,
-          border: '3px solid rgba(99, 102, 241, 0.2)',
-          borderTopColor: '#6366f1',
-          borderRadius: '50%',
-          animation: 'authSpin 0.6s linear infinite',
-        }} />
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   return (
@@ -171,11 +173,17 @@ function AppRoutes() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <EvidenceProvider>
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </EvidenceProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   )
 }

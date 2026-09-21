@@ -137,20 +137,99 @@ class ReportTypeStatus(BaseModel):
     description: str
     domain: str
     available: bool
-    status: str  # "Available" | "Unavailable"
+    status: str  # "Available" | "Unavailable" | "Limited"
+    priority: str = "medium"  # "high" | "medium" | "low"
+    relevance_reason: str | None = None
     required_capabilities: list[str] = Field(default_factory=list)
     missing_capabilities: list[str] = Field(default_factory=list)
+    preview_metrics: list[str] = Field(default_factory=list)
+    dynamic_insight: str | None = None
+    analytics_operations: list[str] = Field(default_factory=list)
+
+
+class AnalysisOpportunity(BaseModel):
+    id: str
+    title: str
+    domain: str
+    reason: str
+    priority: str = "medium"  # "high", "medium", "low"
+    required_capabilities: list[str] = Field(default_factory=list)
+    required_fields: list[str] = Field(default_factory=list)
+    analytics_operations: list[str] = Field(default_factory=list)
+
+
+class DynamicModuleCandidate(BaseModel):
+    module_id: str
+    title: str
+    description: str
+    domain: str
+    priority: str = "medium"
+    reason: str
+    status: str = "available"  # "available", "limited", "unavailable"
+    required_capabilities: list[str] = Field(default_factory=list)
+    required_fields: list[str] = Field(default_factory=list)
+    analytics_operations: list[str] = Field(default_factory=list)
+    preview_metrics: list[str] = Field(default_factory=list)
+    dynamic_insight: str | None = None
+
+
+class DynamicReportPlan(BaseModel):
+    dataset_id: str
+    dataset_version: int = 1
+    report_title: str
+    report_description: str
+    recommended_modules: list[DynamicModuleCandidate] = Field(default_factory=list)
+    excluded_modules: list[dict[str, str]] = Field(default_factory=list)
+    generated_at: str = ""
+
+
+class VerifiedInsight(BaseModel):
+    id: str
+    type: str  # TOP_ENTITY, BOTTOM_ENTITY, LARGEST_SHARE, SMALLEST_SHARE, CONCENTRATION, OUTLIER, DISTRIBUTION, ANOMALY, DATA_QUALITY
+    dimension: str | None = None
+    entity: str | None = None
+    metric: str
+    value: Any = None
+    formatted_value: str = ""
+    rank: int | None = None
+    percentage: float | None = None
+    source_fields: list[str] = Field(default_factory=list)
+    operation: str = ""
+    dataset_id: str = ""
+    dataset_version: int = 1
+    verification_status: str = "verified"
+    summary_text: str = ""
+
+
+class StructuredExecutiveSummary(BaseModel):
+    overview: str
+    key_findings: list[str] = Field(default_factory=list)
+    important_patterns: list[str] = Field(default_factory=list)
+    business_implications: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    sentiment: str = "neutral"
+    is_grounded: bool = True
+    source: str = "deterministic"
+    verified_evidence: dict[str, Any] = Field(default_factory=dict)
 
 
 class ReportResponse(BaseModel):
     report_id: str
     dataset_id: str
+    account_id: str = "account_default"
+    dataset_version: int = 1
+    report_type: str = "standard"
+    status: str = "completed"
     title: str
     subtitle: str
     domain: str
     generated_at: str
     row_count: int
     column_count: int
+    filters: dict[str, Any] = Field(default_factory=dict)
+    snapshot_id: str | None = None
+    is_stale: bool = False
     executive_summary: ExecutiveSummary
     kpi_metrics: list[ReportMetric] = Field(default_factory=list)
     sections: list[ReportSection] = Field(default_factory=list)

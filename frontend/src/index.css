@@ -1,29 +1,98 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-200: #c7d2fe;
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
-  --color-brand-800: #3730a3;
-  --color-brand-900: #312e81;
+  /* Novera Precision Palette */
+  --color-novera-ink: var(--novera-ink);
+  --color-novera-deep-ink: var(--novera-deep-ink);
+  --color-novera-paper: var(--novera-paper);
+  --color-novera-paper-sheet: var(--novera-paper-sheet);
+  --color-novera-paper-sunken: var(--novera-paper-sunken);
+  --color-novera-green: var(--novera-green);
+  --color-novera-green-bright: var(--novera-green-bright);
+  --color-novera-brass: var(--novera-brass);
+  --color-novera-rule: var(--novera-rule);
+  --color-novera-rule-strong: var(--novera-rule-strong);
+  --color-novera-muted: var(--novera-muted);
+  --color-novera-secondary: var(--novera-secondary);
+  --color-novera-flag: var(--novera-flag);
+  --color-novera-warning: var(--novera-warning);
+  --color-novera-info: var(--novera-info);
 
-  --color-surface: #ffffff;
-  --color-surface-raised: #f8fafc;
-  --color-surface-overlay: rgba(255, 255, 255, 0.72);
-  --color-border: #e2e8f0;
-  --color-border-subtle: #f1f5f9;
+  /* Semantic UI Tokens mapped to Novera System */
+  --color-surface: var(--novera-paper);
+  --color-surface-raised: var(--novera-paper-sheet);
+  --color-surface-sunken: var(--novera-paper-sunken);
+  --color-border: var(--novera-rule);
+  --color-border-strong: var(--novera-rule-strong);
+  --color-text-primary: var(--novera-ink);
+  --color-text-secondary: var(--novera-secondary);
+  --color-text-muted: var(--novera-muted);
 
-  --shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-card: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
-  --shadow-elevated: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
-  --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.15);
+  /* Brand / Action references point to Novera Green */
+  --color-brand-50: #f0f7f4;
+  --color-brand-100: #dceee6;
+  --color-brand-200: #b8dcce;
+  --color-brand-300: #88c2ad;
+  --color-brand-400: #57a58b;
+  --color-brand-500: var(--novera-green-bright);
+  --color-brand-600: var(--novera-green);
+  --color-brand-700: #135540;
+  --color-brand-800: #104333;
+  --color-brand-900: #0d372a;
+
+  /* Data Visualization Series (Audited Ledger Colors) */
+  --color-chart-1: var(--novera-green);
+  --color-chart-2: var(--novera-brass);
+  --color-chart-3: var(--novera-info);
+  --color-chart-4: var(--novera-secondary);
+  --color-chart-5: var(--novera-warning);
+  --color-chart-6: var(--novera-flag);
+
+  /* Precise minimal instrument radius */
+  --radius-none: 0px;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+}
+
+:root {
+  /* Light Mode — Crisp Cool Parchment & Deep Ink */
+  --novera-ink: #11181B;
+  --novera-deep-ink: #172125;
+  --novera-paper: #F3F5F1;
+  --novera-paper-sheet: #FFFFFF;
+  --novera-paper-sunken: #E8ECE6;
+  --novera-green: #176B50;
+  --novera-green-bright: #2D8A68;
+  --novera-brass: #A8792E;
+  --novera-rule: #C7CEC8;
+  --novera-rule-strong: #A6AFA8;
+  --novera-muted: #66716C;
+  --novera-secondary: #46524D;
+  --novera-flag: #B33A3A;
+  --novera-warning: #A66A18;
+  --novera-info: #416B7A;
+}
+
+html.dark {
+  /* Dark Mode — Precision Control Desk */
+  --novera-ink: #EEF2EE;
+  --novera-deep-ink: #AAB5AF;
+  --novera-paper: #0E1416;
+  --novera-paper-sheet: #141C1F;
+  --novera-paper-sunken: #0A0F11;
+  --novera-green: #4FAF87;
+  --novera-green-bright: #5EC498;
+  --novera-brass: #D0A45C;
+  --novera-rule: #2B3538;
+  --novera-rule-strong: #3D4A4E;
+  --novera-muted: #7A8983;
+  --novera-secondary: #AAB5AF;
+  --novera-flag: #D06161;
+  --novera-warning: #D0933E;
+  --novera-info: #5B8B9B;
 }
 
 @layer base {
@@ -35,7 +104,8 @@
 
   html {
     scroll-behavior: smooth;
-    background: #f1f5f9;
+    background: var(--novera-paper);
+    color: var(--novera-ink);
   }
 
   body {
@@ -47,8 +117,16 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    color: #0f172a;
-    background: #f1f5f9;
+    color: var(--novera-ink);
+    background: var(--novera-paper);
+  }
+
+  /* All numbers in Novera must use tabular figures */
+  .font-mono,
+  .tabular-nums,
+  [data-numeric='true'] {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 
   button,
@@ -63,53 +141,46 @@
     text-decoration: none;
   }
 
-  img {
-    display: block;
-    max-width: 100%;
-  }
-
   #root {
     min-height: 100vh;
   }
 }
 
 @layer utilities {
-  .glass {
-    background: var(--color-surface-overlay);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+  /* Hairline borders */
+  .border-hairline {
+    border-width: 1px;
+    border-color: var(--novera-rule);
   }
 
-  .gradient-mesh {
-    background-color: #f1f5f9;
-    background-image:
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.08) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.06) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, rgba(16, 185, 129, 0.04) 0px, transparent 50%);
+  .border-hairline-t {
+    border-top: 1px solid var(--novera-rule);
   }
 
-  .gradient-brand {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #6366f1 100%);
+  .border-hairline-b {
+    border-bottom: 1px solid var(--novera-rule);
   }
 
-  .gradient-text {
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  .border-hairline-l {
+    border-left: 1px solid var(--novera-rule);
   }
 
+  .border-hairline-r {
+    border-right: 1px solid var(--novera-rule);
+  }
+
+  /* Desktop Ledger Spine */
+  .ledger-spine {
+    border-left: 1px solid var(--novera-rule);
+  }
+
+  /* Subtle, crisp motion */
   .animate-fade-in {
-    animation: fadeIn 0.4s ease-out forwards;
+    animation: fadeIn 0.18s ease-out forwards;
   }
 
   .animate-slide-up {
-    animation: slideUp 0.5s ease-out forwards;
-  }
-
-  .animate-pulse-soft {
-    animation: pulseSoft 2s ease-in-out infinite;
+    animation: slideUp 0.2s ease-out forwards;
   }
 }
 
@@ -125,7 +196,7 @@
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -133,20 +204,10 @@
   }
 }
 
-@keyframes pulseSoft {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
-}
-
-/* Custom scrollbar */
+/* Precision scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -154,10 +215,9 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 999px;
+  background: var(--novera-rule);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--novera-rule-strong);
 }

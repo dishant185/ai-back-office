@@ -96,11 +96,47 @@ export interface ReportSection {
   callout?: string | null
 }
 
+export interface DynamicSummarySectionData {
+  type:
+    | 'executive_takeaway'
+    | 'finding'
+    | 'comparison'
+    | 'trend'
+    | 'distribution'
+    | 'data_quality'
+    | 'business_implication'
+    | 'recommendation'
+    | 'limitation'
+    | 'next_action'
+    | 'observation'
+    | string
+  title: string
+  content: string
+  evidence_ids?: string[]
+}
+
 export interface ExecutiveSummary {
   overview: string
+  summary?: string
+  sections?: DynamicSummarySectionData[]
   key_highlights: string[]
   critical_findings: string[]
+  key_findings?: string[]
+  important_patterns?: string[]
+  business_implications?: string[]
+  recommendations?: string[]
+  limitations?: string[]
   sentiment: 'positive' | 'neutral' | 'cautionary'
+  is_grounded?: boolean
+  source?: string
+  verified_evidence?: {
+    title?: string
+    domain?: string
+    row_count?: number
+    column_count?: number
+    data_hygiene_score?: string
+    verified_metrics?: Array<{ metric: string; value: string }>
+  }
 }
 
 export interface ReportTypeStatus {
@@ -109,20 +145,32 @@ export interface ReportTypeStatus {
   description: string
   domain: string
   available: boolean
-  status: 'Available' | 'Unavailable'
+  status: 'Available' | 'Unavailable' | 'Limited'
+  priority?: 'high' | 'medium' | 'low'
+  relevance_reason?: string
   required_capabilities: string[]
   missing_capabilities: string[]
+  preview_metrics?: string[]
+  dynamic_insight?: string
+  analytics_operations?: string[]
 }
 
 export interface ReportResponse {
   report_id: string
   dataset_id: string
+  account_id?: string
+  dataset_version?: number
+  report_type?: string
+  status?: string
   title: string
   subtitle: string
   domain: string
   generated_at: string
   row_count: number
   column_count: number
+  filters?: Record<string, any>
+  snapshot_id?: string | null
+  is_stale?: boolean
   executive_summary: ExecutiveSummary
   kpi_metrics: ReportMetric[]
   sections: ReportSection[]
@@ -136,8 +184,16 @@ export interface ReportResponse {
 export interface ReportSummaryItem {
   report_id: string
   dataset_id: string
+  account_id?: string
+  dataset_version?: number
+  current_dataset_version?: number
+  is_stale?: boolean
+  status?: string
+  report_type?: string
   title: string
   domain: string
-  generated_at: string
   row_count: number
+  column_count?: number
+  generated_at: string
+  filters?: Record<string, any>
 }

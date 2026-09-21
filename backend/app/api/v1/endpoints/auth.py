@@ -3,9 +3,10 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.core.deps import get_current_user
+from app.core.rate_limiter import extract_client_ip, login_rate_limiter
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.mongodb import get_users_collection
 from app.schemas.auth import (
@@ -80,16 +81,24 @@ def register(payload: UserRegisterRequest) -> TokenResponse:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: UserLoginRequest) -> TokenResponse:
-    users = get_users_collection()
+def login(payload: UserLoginRequest, request: Request) -> TokenResponse:
+    ip = extract_client_ip(request)
     normalized_email = payload.email.lower().strip()
 
+    # Rate limiting / brute-force lockout check
+    login_rate_limiter.check_rate_limit(ip, normalized_email)
+
+    users = get_users_collection()
     user = users.find_one({"email": normalized_email})
     if not user or not verify_password(payload.password, user.get("hashed_password", "")):
+        login_rate_limiter.record_failure(ip, normalized_email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password. Please verify your credentials.",
         )
+
+    # Clear failure history on success
+    login_rate_limiter.record_success(ip, normalized_email)
 
     user_id = str(user.get("id"))
     token = create_access_token({"sub": user_id, "email": normalized_email})

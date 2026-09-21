@@ -22,13 +22,14 @@ import {
   Zap,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardHeader } from '../components/ui/Card'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useAuth, type AuthUser } from '../context/AuthContext'
-import api from '../services/api'
+import api, { healthService } from '../services/api'
 
 type TabType = 'general' | 'preferences' | 'security' | 'audit'
 
@@ -108,6 +109,12 @@ export default function Profile() {
   const [copiedKey, setCopiedKey] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [apiKey, setApiKey] = useState('ab_live_89f7a62d04bc912e847c3e551a0b38d')
+
+  const { data: readiness } = useQuery({
+    queryKey: ['profile-readiness'],
+    queryFn: healthService.getReadiness,
+    refetchInterval: 30000,
+  })
 
   // Load profile from API on mount
   useEffect(() => {
@@ -743,20 +750,20 @@ export default function Profile() {
             </CardContent>
           </Card>
 
-          <Card className="border-slate-200/80 shadow-sm">
+          <Card className="border-border shadow-xs bg-surface-raised">
             <CardHeader>
-              <h3 className="text-sm font-bold text-slate-900">Active Security Sessions</h3>
+              <h3 className="text-sm font-bold text-text-primary">Active Session &amp; System Telemetry</h3>
             </CardHeader>
             <CardContent>
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-border">
                 <div className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
                       <Zap className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-800">Current Web Session (Windows / Chrome)</p>
-                      <p className="text-xs text-slate-400">IP: 127.0.0.1 &bull; Active Now</p>
+                      <p className="text-sm font-semibold text-text-primary">Current Authenticated Session</p>
+                      <p className="text-xs text-text-muted">Authenticated via JWT &bull; Active Now</p>
                     </div>
                   </div>
                   <Badge variant="success" dot>Current</Badge>
@@ -764,15 +771,40 @@ export default function Profile() {
 
                 <div className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-sunken text-text-secondary">
                       <Database className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-800">Local FastAPI Daemon</p>
-                      <p className="text-xs text-slate-400">Port 8000 &bull; Bound to 127.0.0.1</p>
+                      <p className="text-sm font-semibold text-text-primary">
+                        Database Connection
+                      </p>
+                      <p className="text-xs text-text-muted">
+                        Environment: {readiness?.environment || 'development'} &bull; Status: {readiness?.database?.status || 'connecting'}
+                      </p>
                     </div>
                   </div>
-                  <Badge variant="default">Verified</Badge>
+                  <Badge variant={readiness?.database?.connected ? 'success' : 'danger'}>
+                    {readiness?.database?.connected ? 'Connected' : 'Offline'}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-sunken text-text-secondary">
+                      <Cpu className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">
+                        AI Provider Engine ({readiness?.llm?.details?.provider || 'Configured LLM'})
+                      </p>
+                      <p className="text-xs text-text-muted">
+                        Model: {readiness?.llm?.details?.model || 'default'} &bull; Status: {readiness?.llm?.status || 'checking'}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant={readiness?.llm?.connected ? 'success' : (readiness?.llm?.status === 'not_configured' ? 'warning' : 'danger')}>
+                    {readiness?.llm?.connected ? 'Operational' : (readiness?.llm?.status === 'not_configured' ? 'Not Configured' : 'Offline')}
+                  </Badge>
                 </div>
               </div>
             </CardContent>

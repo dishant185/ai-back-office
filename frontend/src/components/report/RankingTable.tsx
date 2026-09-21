@@ -36,9 +36,16 @@ export function RankingTable({ ranking }: RankingTableProps) {
                   >
                     {item.rank}
                   </span>
-                  <span className="font-medium text-slate-700 truncate max-w-[180px] sm:max-w-[240px]">
-                    {item.label}
-                  </span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-medium text-slate-700 truncate max-w-[200px] sm:max-w-[280px]">
+                      {item.label}
+                    </span>
+                    {item.subtext && (
+                      <span className="text-[10px] text-slate-400 font-normal truncate max-w-[200px] sm:max-w-[280px]">
+                        {item.subtext}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {item.pct_of_total !== undefined && item.pct_of_total !== null && (

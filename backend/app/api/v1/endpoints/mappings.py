@@ -95,39 +95,108 @@ def apply_mappings(
 def list_mappings(
     current_user: dict[str, Any] | None = Depends(get_optional_user),
 ) -> list[dict[str, Any]]:
-    """Returns all saved column mappings for the current user."""
+    """Returns all datasets as mapping cards for the current user/account."""
     user_id = str(current_user.get("id")) if current_user else "guest"
+    account_id = str(current_user.get("account_id")) if current_user and current_user.get("account_id") else "account_default"
     try:
         mappings_col = get_mappings_collection()
-        cursor = mappings_col.find({"user_id": user_id}).sort("updated_at", -1)
+        saved_cursor = mappings_col.find({"$or": [{"user_id": user_id}, {"account_id": account_id}]}).sort("updated_at", -1)
+        saved_by_id: dict[str, dict[str, Any]] = {doc["upload_id"]: doc for doc in saved_cursor if doc.get("upload_id")}
 
-        # Also fetch upload metadata to enrich with filenames
+        # Fetch all datasets from uploads and datasets collections
         from app.db.mongodb import get_uploads_collection
+        from app.db.database import get_datasets_collection
         uploads_col = get_uploads_collection()
+        datasets_col = get_datasets_collection()
 
+        all_uploads: dict[str, dict[str, Any]] = {}
+        for doc in uploads_col.find({"$or": [{"user_id": user_id}, {"account_id": account_id}]}).sort("created_at", -1):
+            uid = doc.get("upload_id")
+            if uid and uid not in all_uploads:
+                all_uploads[uid] = doc
+
+        for doc in datasets_col.find({"$or": [{"user_id": user_id}, {"account_id": account_id}]}).sort("created_at", -1):
+            uid = doc.get("dataset_id") or doc.get("upload_id")
+            if uid and uid not in all_uploads:
+                all_uploads[uid] = doc
+
+        # Merge saved mappings and datasets
         results: list[dict[str, Any]] = []
-        for doc in cursor:
-            upload_id = doc.get("upload_id", "")
-            mapping_summary = doc.get("mapping_summary", {})
+        seen_ids: set[str] = set()
 
-            # Try to get filename from uploads collection
-            upload_doc = uploads_col.find_one({"upload_id": upload_id})
-            filename = (upload_doc or {}).get("filename", upload_id)
-            file_size = (upload_doc or {}).get("file_size", 0)
-            upload_summary = (upload_doc or {}).get("summary", {})
+        # First add items that have saved mappings
+        for upload_id, saved_doc in saved_by_id.items():
+            if upload_id in seen_ids:
+                continue
+            seen_ids.add(upload_id)
+            mapping_summary = saved_doc.get("mapping_summary", {})
+            u_doc = all_uploads.get(upload_id, {})
+            u_sum = u_doc.get("summary", {})
+            col_count = u_sum.get("columns") or u_doc.get("column_count") or mapping_summary.get("original_columns", 0)
+            row_count = u_sum.get("rows") or u_doc.get("row_count", 0)
 
             results.append({
                 "upload_id": upload_id,
-                "filename": filename,
-                "file_size": file_size,
-                "row_count": upload_summary.get("row_count", 0),
-                "column_count": upload_summary.get("column_count", 0),
-                "mapped_fields": mapping_summary.get("mapped", 0),
+                "filename": u_doc.get("filename") or u_doc.get("file_name") or upload_id,
+                "file_size": u_doc.get("file_size", 0),
+                "row_count": row_count,
+                "column_count": col_count,
+                "mapped_fields": mapping_summary.get("mapped", col_count),
                 "unmapped_fields": mapping_summary.get("unmapped", 0),
-                "total_fields": mapping_summary.get("original_columns", 0),
-                "updated_at": doc.get("updated_at"),
+                "total_fields": mapping_summary.get("original_columns", col_count),
+                "updated_at": saved_doc.get("updated_at") or u_doc.get("created_at"),
             })
+
+        # Then add all other uploaded datasets that don't have a saved mapping yet
+        for upload_id, u_doc in all_uploads.items():
+            if upload_id in seen_ids:
+                continue
+            seen_ids.add(upload_id)
+            u_sum = u_doc.get("summary", {})
+            col_count = u_sum.get("columns") or u_doc.get("column_count", 0)
+            row_count = u_sum.get("rows") or u_doc.get("row_count", 0)
+
+            results.append({
+                "upload_id": upload_id,
+                "filename": u_doc.get("filename") or u_doc.get("file_name") or upload_id,
+                "file_size": u_doc.get("file_size", 0),
+                "row_count": row_count,
+                "column_count": col_count,
+                "mapped_fields": 0,
+                "unmapped_fields": col_count,
+                "total_fields": col_count,
+                "updated_at": u_doc.get("created_at"),
+            })
+
         return results
     except Exception:
         return []
+
+
+@router.get("/{upload_id}")
+def get_mapping_by_id(
+    upload_id: str,
+    current_user: dict[str, Any] | None = Depends(get_optional_user),
+) -> dict[str, Any]:
+    """Get saved column mappings for a specific dataset/upload."""
+    user_id = str(current_user.get("id")) if current_user else "guest"
+    account_id = str(current_user.get("account_id")) if current_user and current_user.get("account_id") else "account_default"
+    mappings_col = get_mappings_collection()
+    doc = mappings_col.find_one({"upload_id": upload_id, "$or": [{"user_id": user_id}, {"account_id": account_id}]})
+    if not doc:
+        # Check without user filter for guest
+        doc = mappings_col.find_one({"upload_id": upload_id})
+    if doc:
+        return {
+            "upload_id": upload_id,
+            "mappings": doc.get("mappings", []),
+            "mapping_summary": doc.get("mapping_summary", {}),
+            "updated_at": doc.get("updated_at"),
+        }
+    return {
+        "upload_id": upload_id,
+        "mappings": [],
+        "mapping_summary": {},
+    }
+
 

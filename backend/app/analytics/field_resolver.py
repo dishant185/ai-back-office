@@ -20,6 +20,11 @@ FIELD_ALIASES: dict[str, set[str]] = {
     "region": {"region", "territory", "area"},
     "experience": {"experience", "years_experience"},
     "department": {"department", "division"},
+    "revenue": {"revenue", "amount", "sales_amount", "sales", "total_sales", "order_amount", "net_amount"},
+    "profit": {"profit", "gross_profit", "net_profit", "margin"},
+    "quantity": {"quantity", "qty", "quantity_sold", "units", "units_sold"},
+    "product": {"product", "product_name", "item", "item_name", "sku", "product_id"},
+    "category": {"category", "product_category", "sub_category", "item_category"},
 }
 
 

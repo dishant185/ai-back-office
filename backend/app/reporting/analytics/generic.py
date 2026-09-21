@@ -18,7 +18,7 @@ class GenericAnalytics:
 
     @classmethod
     def analyze(
-        cls, frame: pd.DataFrame
+        cls, frame: pd.DataFrame, report_type: str = "standard"
     ) -> tuple[list[ReportMetric], list[ReportSection], list[ReportAnomaly], list[ReportRecommendation]]:
         row_count = int(len(frame.index))
         col_count = int(len(frame.columns))

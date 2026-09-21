@@ -18,6 +18,7 @@ import {
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent } from '../components/ui/Card'
+import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import { PageHeader } from '../components/ui/PageHeader'
 import { StatCard } from '../components/ui/StatCard'
 import api from '../services/api'
@@ -170,7 +171,8 @@ E1010,36,No,Research & Development,27,3,Healthcare Representative,5237,7,2`
     uploadState === 'success' ? '100%' : uploadState === 'uploading' ? '70%' : '35%'
 
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
+    <ErrorBoundary fallbackTitle="Data Ingestion &amp; Profiling">
+      <div className="space-y-8 animate-fade-in pb-12">
       {/* Top Header */}
       <PageHeader
         eyebrow="Data Ingestion & Profiling"
@@ -332,8 +334,8 @@ E1010,36,No,Research & Development,27,3,Healthcare Representative,5237,7,2`
                       <span>Ingestion Progress</span>
                       <span className="text-brand-600">
                         {uploadState === 'selected' && 'Ready for Deep Profiling'}
-                        {uploadState === 'uploading' && 'Auditing & Computing Nulls...'}
-                        {uploadState === 'success' && 'Ingestion & Audit Complete'}
+                        {uploadState === 'uploading' && 'Analyzing dataset & building knowledge...'}
+                        {uploadState === 'success' && 'Dataset analyzed and AI knowledge profile created.'}
                         {uploadState === 'error' && 'Ingestion Failed'}
                       </span>
                     </div>
@@ -508,6 +510,7 @@ E1010,36,No,Research & Development,27,3,Healthcare Representative,5237,7,2`
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   )
 }

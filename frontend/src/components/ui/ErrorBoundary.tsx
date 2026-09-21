@@ -34,16 +34,16 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <Card className="border-red-200 bg-red-50/50 p-6 shadow-sm my-6">
+        <Card className="border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 p-6 shadow-xs my-6">
           <CardContent className="space-y-4 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400">
               <AlertCircle className="h-6 w-6" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-base font-bold text-red-900">
+              <h3 className="text-base font-bold text-rose-900 dark:text-rose-100">
                 {this.props.fallbackTitle || 'Rendering Error'}
               </h3>
-              <p className="text-xs text-red-700 leading-relaxed max-w-md mx-auto">
+              <p className="text-xs text-rose-700 dark:text-rose-300 leading-relaxed max-w-md mx-auto">
                 {this.state.error?.message || 'An unexpected rendering error occurred while rendering this section.'}
               </p>
             </div>

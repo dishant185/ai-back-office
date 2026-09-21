@@ -1,0 +1,56 @@
+"""Semantic aliases and canonical field mappings across business domains."""
+from __future__ import annotations
+
+# Domain canonical mappings
+DOMAIN_ALIASES: dict[str, dict[str, list[str]]] = {
+    "sales": {
+        "transaction_id": ["order_id", "order id", "order_number", "invoice_id", "invoice_number", "transaction_id", "trans_id"],
+        "transaction_date": ["order_date", "order date", "sale_date", "date", "invoice_date", "timestamp"],
+        "sales_rep": ["sales_rep", "sales rep", "rep", "agent", "sales_executive", "representative", "employee_name", "salesperson"],
+        "region": ["region", "zone", "territory", "area", "market", "sales_region"],
+        "sales_amount": ["sales_amount", "sales", "revenue", "amount", "total_sales", "order_amount", "net_sales"],
+        "quantity": ["quantity_sold", "quantity", "qty", "units_sold", "units", "count"],
+        "category": ["product_category", "category", "product_line", "item_group", "type"],
+        "sub_category": ["sub_category", "sub-category", "subcategory", "item_subgroup"],
+        "product_id": ["product_id", "product id", "sku", "item_code", "item_id", "product"],
+        "unit_cost": ["unit_cost", "cost", "cost_price", "purchase_price", "cogs"],
+        "unit_price": ["unit_price", "price", "selling_price", "retail_price"],
+        "customer_type": ["customer_type", "client_type", "segment", "account_type"],
+        "discount": ["discount", "discount_pct", "discount_rate", "rebate"],
+        "payment_method": ["payment_method", "payment_mode", "payment_type", "paymentmode", "tender_type"],
+        "sales_channel": ["sales_channel", "channel", "platform", "store_type"],
+        "profit": ["profit", "net_profit", "gross_profit", "margin", "earnings"],
+    },
+    "hr": {
+        "employee_id": ["employee_id", "emp_id", "staff_id", "worker_id", "id"],
+        "age": ["age", "employee_age", "years_old"],
+        "gender": ["gender", "sex"],
+        "city": ["city", "work_location", "office_location", "location", "branch"],
+        "education": ["education", "qualification", "degree", "education_level"],
+        "joining_year": ["joiningyear", "joining_year", "year_joined", "hire_year", "start_year"],
+        "payment_tier": ["paymenttier", "payment_tier", "salary_tier", "pay_grade", "tier"],
+        "experience": ["experienceincurrentdomain", "experience", "experience_years", "domain_experience", "tenure"],
+        "attrition": ["leaveornot", "attrition", "left", "resigned", "turnover", "terminated", "status"],
+        "department": ["department", "dept", "team", "division", "business_unit"],
+        "benched": ["everbenched", "benched", "on_bench"],
+    },
+    "inventory": {
+        "item_id": ["item_id", "item_code", "sku", "product_id"],
+        "item_name": ["item_name", "product_name", "description", "title"],
+        "category": ["category", "group", "item_type"],
+        "stock_quantity": ["stock_quantity", "current_stock", "quantity_on_hand", "stock", "beginning_stock"],
+        "reorder_level": ["reorder_level", "min_stock", "threshold"],
+        "unit_cost": ["unit_cost", "cost", "cost_price"],
+        "unit_price": ["unit_price", "price", "selling_price"],
+        "warehouse": ["warehouse", "storage_location", "depot"],
+        "supplier": ["supplier", "vendor", "supplier_name"],
+    },
+    "customer": {
+        "customer_id": ["customer_id", "account_id", "client_id", "user_id"],
+        "customer_name": ["customer_name", "client_name", "name", "account_name"],
+        "city": ["city", "customer_city", "buyer_city", "location"],
+        "state": ["state", "province", "region"],
+        "customer_type": ["customer_type", "segment", "tier"],
+        "annual_spend": ["annual_spend", "total_spend", "lifetime_value", "ltv"],
+    },
+}

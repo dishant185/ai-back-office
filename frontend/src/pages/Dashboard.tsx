@@ -10,7 +10,6 @@ import {
   FileSpreadsheet,
   FileText,
   Layers,
-  Plus,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -18,12 +17,16 @@ import {
   Upload,
   Zap,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardHeader } from '../components/ui/Card'
+import { StatCardSkeleton, TableSkeleton } from '../components/ui/Skeleton'
+import { EmptyState } from '../components/ui/EmptyState'
+import { ErrorState } from '../components/ui/ErrorState'
+import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import { reportService } from '../services/reportService'
 import api from '../services/api'
 import type { ReportSummaryItem } from '../types/report'
@@ -84,45 +87,37 @@ function timeAgo(isoString: string | null | undefined): string {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [reports, setReports] = useState<ReportSummaryItem[]>([])
-  const [loadingReports, setLoadingReports] = useState(true)
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [loadingStats, setLoadingStats] = useState(true)
 
-  // Load real generated reports from the backend
-  useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        const list = await reportService.listReports()
-        setReports(list)
-      } catch (err) {
-        console.error('Failed to load reports on dashboard:', err)
-      } finally {
-        setLoadingReports(false)
-      }
-    }
-    void fetchReports()
-  }, [])
+  const {
+    data: reports = [],
+    isLoading: loadingReports,
+    isError: isReportsError,
+    error: reportsError,
+    refetch: refetchReports,
+  } = useQuery<ReportSummaryItem[]>({
+    queryKey: ['dashboard-reports'],
+    queryFn: () => reportService.listReports(),
+  })
 
-  // Load dashboard stats from the backend
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await api.get<DashboardStats>('/api/v1/dashboard/stats')
-        setStats(response.data)
-      } catch (err) {
-        console.error('Failed to load dashboard stats:', err)
-      } finally {
-        setLoadingStats(false)
-      }
-    }
-    void fetchStats()
-  }, [])
+  const {
+    data: stats,
+    isLoading: loadingStats,
+    isError: isStatsError,
+    error: statsError,
+    refetch: refetchStats,
+  } = useQuery<DashboardStats>({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
+      const response = await api.get<DashboardStats>('/api/v1/dashboard/stats')
+      return response.data
+    },
+  })
 
   const totalRecords = stats?.total_records || reports.reduce((acc, r) => acc + (r.row_count || 0), 0)
 
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
+    <ErrorBoundary fallbackTitle="Dashboard Error">
+      <div className="space-y-8 animate-fade-in pb-12">
       {/* Executive Command Center Hero Banner */}
       <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-10 text-white shadow-xl shadow-slate-900/10">
         <div className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full bg-brand-500/20 blur-3xl" />
@@ -196,87 +191,97 @@ export default function Dashboard() {
       </div>
 
       {/* Key Metric Tiles */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Metric 1 */}
-        <Card className="relative overflow-hidden border-slate-200/80 shadow-sm transition hover:shadow-md hover:border-brand-300">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-brand-50 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Processed Records</span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-                <Database className="h-5 w-5" />
+      {loadingStats ? (
+        <StatCardSkeleton count={4} />
+      ) : isStatsError ? (
+        <ErrorState
+          title="Unable to load operational metrics"
+          message={(statsError as Error)?.message || 'Failed to fetch platform metrics.'}
+          onRetry={() => refetchStats()}
+        />
+      ) : (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Metric 1 */}
+          <Card className="relative overflow-hidden border-border bg-surface-raised shadow-2xs transition hover:shadow-xs hover:border-brand-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-brand-500/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Processed Records</span>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400">
+                  <Database className="h-5 w-5" />
+                </div>
               </div>
-            </div>
-            <p className="mt-3 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {totalRecords > 0 ? totalRecords.toLocaleString() : '0'}
-            </p>
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span>100% Deterministic Integrity</span>
-            </div>
-          </CardContent>
-        </Card>
+              <p className="mt-3 text-2xl sm:text-3xl font-black text-text-primary tracking-tight">
+                {totalRecords > 0 ? totalRecords.toLocaleString() : '0'}
+              </p>
+              <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                <TrendingUp className="h-3.5 w-3.5" />
+                <span>100% Deterministic Integrity</span>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Metric 2 */}
-        <Card className="relative overflow-hidden border-slate-200/80 shadow-sm transition hover:shadow-md hover:border-violet-300">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-violet-50 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Executive Reports</span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                <FileSpreadsheet className="h-5 w-5" />
+          {/* Metric 2 */}
+          <Card className="relative overflow-hidden border-border bg-surface-raised shadow-2xs transition hover:shadow-xs hover:border-violet-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Executive Reports</span>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400">
+                  <FileSpreadsheet className="h-5 w-5" />
+                </div>
               </div>
-            </div>
-            <p className="mt-3 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {stats?.total_reports ?? reports.length}
-            </p>
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-brand-600 font-semibold">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              <span>Multi-domain C-Suite Briefs</span>
-            </div>
-          </CardContent>
-        </Card>
+              <p className="mt-3 text-2xl sm:text-3xl font-black text-text-primary tracking-tight">
+                {stats?.total_reports ?? reports.length}
+              </p>
+              <div className="mt-2 flex items-center gap-1.5 text-xs text-brand-600 dark:text-brand-400 font-semibold">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>Multi-domain C-Suite Briefs</span>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Metric 3 */}
-        <Card className="relative overflow-hidden border-slate-200/80 shadow-sm transition hover:shadow-md hover:border-emerald-300">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Datasets Uploaded</span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                <Layers className="h-5 w-5" />
+          {/* Metric 3 */}
+          <Card className="relative overflow-hidden border-border bg-surface-raised shadow-2xs transition hover:shadow-xs hover:border-emerald-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Datasets Uploaded</span>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                  <Layers className="h-5 w-5" />
+                </div>
               </div>
-            </div>
-            <p className="mt-3 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {stats?.total_uploads ?? 0}
-            </p>
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
-              <Zap className="h-3.5 w-3.5" />
-              <span>Ingested &amp; Profiled</span>
-            </div>
-          </CardContent>
-        </Card>
+              <p className="mt-3 text-2xl sm:text-3xl font-black text-text-primary tracking-tight">
+                {stats?.total_uploads ?? 0}
+              </p>
+              <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                <Zap className="h-3.5 w-3.5" />
+                <span>Ingested &amp; Profiled</span>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Metric 4 */}
-        <Card className="relative overflow-hidden border-slate-200/80 shadow-sm transition hover:shadow-md hover:border-indigo-300">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Schema Mappings</span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                <Sparkles className="h-5 w-5" />
+          {/* Metric 4 */}
+          <Card className="relative overflow-hidden border-border bg-surface-raised shadow-2xs transition hover:shadow-xs hover:border-indigo-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Schema Mappings</span>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                  <Sparkles className="h-5 w-5" />
+                </div>
               </div>
-            </div>
-            <p className="mt-3 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {stats?.total_mappings ?? 0}
-            </p>
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-indigo-600 font-semibold">
-              <Activity className="h-3.5 w-3.5" />
-              <span>Column Harmonizations Applied</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <p className="mt-3 text-2xl sm:text-3xl font-black text-text-primary tracking-tight">
+                {stats?.total_mappings ?? 0}
+              </p>
+              <div className="mt-2 flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 font-semibold">
+                <Activity className="h-3.5 w-3.5" />
+                <span>Column Harmonizations Applied</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Main Command Center Grid */}
       <div className="grid gap-8 lg:grid-cols-3">
@@ -298,24 +303,21 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {loadingReports ? (
-                <div className="py-12 text-center text-slate-400">
-                  <RefreshCw className="mx-auto h-6 w-6 animate-spin text-brand-500 mb-2" />
-                  <p className="text-xs font-medium">Loading stored intelligence reports...</p>
-                </div>
+                <TableSkeleton rows={4} cols={3} />
+              ) : isReportsError ? (
+                <ErrorState
+                  title="Unable to load stored reports"
+                  message={(reportsError as Error)?.message || 'Failed to fetch executive reports.'}
+                  onRetry={() => refetchReports()}
+                />
               ) : reports.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
-                  <FileText className="mx-auto h-10 w-10 text-slate-300 mb-2" />
-                  <p className="text-sm font-bold text-slate-700">No Intelligence Reports Yet</p>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                    Upload your first CSV or Excel file to generate an autonomous, C-suite grade executive report.
-                  </p>
-                  <Link to="/upload" className="mt-4 inline-block">
-                    <Button size="sm">
-                      <Plus className="mr-1.5 h-3.5 w-3.5" />
-                      Generate First Report
-                    </Button>
-                  </Link>
-                </div>
+                <EmptyState
+                  icon={FileSpreadsheet}
+                  title="No Intelligence Reports Yet"
+                  description="Upload your first CSV or Excel file to generate an autonomous, C-suite grade executive report."
+                  actionLabel="Generate First Report"
+                  onAction={() => navigate('/upload')}
+                />
               ) : (
                 <div className="space-y-3">
                   {reports.slice(0, 5).map((rep) => {
@@ -395,27 +397,24 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {loadingStats ? (
-                <div className="py-8 text-center text-slate-400">
-                  <RefreshCw className="mx-auto h-5 w-5 animate-spin text-brand-500 mb-2" />
-                  <p className="text-xs font-medium">Loading datasets...</p>
-                </div>
+                <TableSkeleton rows={3} cols={2} />
+              ) : isStatsError ? (
+                <ErrorState
+                  title="Unable to load datasets"
+                  message={(statsError as Error)?.message || 'Failed to fetch uploaded datasets.'}
+                  onRetry={() => refetchStats()}
+                />
               ) : !stats?.recent_uploads?.length ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
-                  <Database className="mx-auto h-10 w-10 text-slate-300 mb-2" />
-                  <p className="text-sm font-bold text-slate-700">No Datasets Uploaded Yet</p>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                    Upload your first CSV or Excel file to start profiling and standardizing your data.
-                  </p>
-                  <Link to="/upload" className="mt-4 inline-block">
-                    <Button size="sm">
-                      <Plus className="mr-1.5 h-3.5 w-3.5" />
-                      Upload First Dataset
-                    </Button>
-                  </Link>
-                </div>
+                <EmptyState
+                  icon={Database}
+                  title="No Datasets Uploaded Yet"
+                  description="Upload your first CSV or Excel file to start profiling and standardizing your data."
+                  actionLabel="Upload First Dataset"
+                  onAction={() => navigate('/upload')}
+                />
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {stats.recent_uploads.map((ds) => (
+                  {stats.recent_uploads.slice(0, 5).map((ds) => (
                     <div key={ds.upload_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
@@ -443,6 +442,16 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
+                  {stats.recent_uploads.length > 5 && (
+                    <div className="pt-3 text-center">
+                      <Link to="/upload">
+                        <Button variant="ghost" size="sm" className="text-xs text-brand-600 hover:text-brand-700 font-semibold">
+                          View All {stats.recent_uploads.length} Datasets
+                          <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -511,6 +520,32 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
+          {/* AI Business Analyst Card */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-indigo-600 to-violet-600 p-5 shadow-lg shadow-brand-500/20">
+            <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+            <div className="pointer-events-none absolute -left-6 -bottom-6 h-24 w-24 rounded-full bg-violet-400/20 blur-2xl" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
+                  <Sparkles className="h-3.5 w-3.5 text-white" />
+                </div>
+                <span className="text-[11px] font-bold text-white/80 uppercase tracking-wider">AI Business Analyst</span>
+              </div>
+              <p className="text-base font-extrabold text-white leading-snug">
+                Ask questions. Discover insights. Make better decisions.
+              </p>
+              <p className="text-xs text-white/60 mt-1.5 leading-relaxed">
+                Powered by verified deterministic analytics + local AI.
+              </p>
+              <Link to="/ai-analyst" className="mt-4 block">
+                <button className="w-full flex items-center justify-center gap-2 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20 px-4 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:bg-white/25 hover:border-white/30 hover:shadow-lg active:scale-[0.98]">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Ask AI Analyst
+                </button>
+              </Link>
+            </div>
+          </div>
+
           {/* Autonomous Copilot Recommendations — dynamic from recent activity */}
           <Card className="border-slate-200/80 shadow-sm bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white">
             <CardHeader className="pb-3 border-b border-white/10">
@@ -569,6 +604,7 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
-    </div>
+      </div>
+    </ErrorBoundary>
   )
 }
