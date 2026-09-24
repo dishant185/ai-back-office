@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from typing import Any
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import router as v1_router
@@ -17,6 +18,21 @@ async def lifespan(app: FastAPI):
         init_indexes()
     except Exception as exc:
         app_logger.warning("MongoDB index initialization error: %s", exc)
+
+    # Migrate and enforce tenant data ownership
+    try:
+        from app.db.migrate import migrate_tenant_data
+        migrate_tenant_data()
+    except Exception as exc:
+        app_logger.warning("Tenant data migration error: %s", exc)
+
+    # Recover any stale processing jobs from previous server runs
+    try:
+        from app.services.job_service import recover_stale_jobs
+        recover_stale_jobs(timeout_seconds=300)
+    except Exception as exc:
+        app_logger.warning("Stale job recovery error: %s", exc)
+
 
     # Startup LLM reachability verification
     if settings.ai_enabled:
@@ -83,6 +99,26 @@ def health() -> HealthResponse:
             details=db_health,
         ),
     )
+
+
+@app.get("/ready")
+def ready(response: Response) -> dict[str, Any]:
+    """Readiness probe verifying MongoDB connectivity for request serving."""
+    db_health = check_mongo_health()
+    if not db_health.get("connected", False):
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {
+            "status": "unhealthy",
+            "dependencies": {
+                "mongodb": "disconnected",
+            },
+        }
+    return {
+        "status": "ready",
+        "dependencies": {
+            "mongodb": "connected",
+        },
+    }
 
 
 @app.get("/readiness", response_model=ReadinessResponse)

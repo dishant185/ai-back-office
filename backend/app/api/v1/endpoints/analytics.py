@@ -1,29 +1,54 @@
+"""Analytics execution endpoints with strict multi-tenant authorization."""
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.analytics.engine import AnalyticsEngine
-from app.core.config import settings
-from app.data.loader import DataLoader
+from app.core.deps import AuthorizedScope, get_authorized_scope
+from app.data.loader import DataLoader, load_tabular_file
+from app.db.repositories.dataset_repository import DatasetRepository
 from app.schemas.analytics import AnalyticsRunRequest, AnalyticsRunResponse
 
 router = APIRouter()
 
 
+class QueryRequest(BaseModel):
+    question: str
+    dataset_id: str
+
+
+class PlanRequest(BaseModel):
+    question: str
+    dataset_id: str
+
+
+def _load_frame_helper(dataset_id: str, account_id: str):
+    repo = DatasetRepository()
+    doc = repo.get_by_id(dataset_id, account_id=account_id)
+    if doc and (doc.get("file_path") or doc.get("saved_path")):
+        fpath = doc.get("file_path") or doc.get("saved_path")
+        if fpath and Path(fpath).exists():
+            return load_tabular_file(Path(fpath))
+    return None
+
+
 @router.post("/run", response_model=AnalyticsRunResponse)
 @router.post("/analytics/run", response_model=AnalyticsRunResponse)
-def run_analytics(payload: AnalyticsRunRequest) -> AnalyticsRunResponse:
-    dataset_path = Path(settings.upload_dir) / payload.dataset_id
-    if not dataset_path.exists():
+def run_analytics(
+    payload: AnalyticsRunRequest,
+    scope: AuthorizedScope = Depends(get_authorized_scope),
+) -> AnalyticsRunResponse:
+    frame = _load_frame_helper(payload.dataset_id, scope.account_id)
+    if frame is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset {payload.dataset_id} was not found.",
+            detail=f"Dataset {payload.dataset_id} was not found or unauthorized.",
         )
 
-    frame = DataLoader().load_file(dataset_path)
     engine = AnalyticsEngine(frame)
     result = engine.analyze(frame)
 
@@ -40,41 +65,22 @@ def run_analytics(payload: AnalyticsRunRequest) -> AnalyticsRunResponse:
     )
 
 
-class QueryRequest(BaseModel):
-    question: str
-    dataset_id: str
-
-
-class PlanRequest(BaseModel):
-    question: str
-    dataset_id: str
-
-
-def _load_frame_helper(dataset_id: str):
-    from app.db.repositories.dataset_repository import DatasetRepository
-    from app.data.loader import load_tabular_file
-    repo = DatasetRepository()
-    doc = repo.get_by_id(dataset_id)
-    if doc and doc.get("file_path") and Path(doc["file_path"]).exists():
-        return load_tabular_file(Path(doc["file_path"]))
-    for d in [Path("data/uploads"), Path("../data/uploads")]:
-        if d.exists():
-            for f in d.glob("*.*"):
-                if dataset_id in f.name or f.stem == dataset_id:
-                    return load_tabular_file(f)
-    return None
-
-
 @router.post("/query")
-def execute_analytics_query(payload: QueryRequest) -> dict:
+def execute_analytics_query(
+    payload: QueryRequest,
+    scope: AuthorizedScope = Depends(get_authorized_scope),
+) -> dict[str, Any]:
     """Execute a deterministic query plan for a natural-language question."""
     from app.analyst.query_planner import QueryPlanner
     from app.analyst.query_validator import QueryValidator
     from app.data.semantic.schema_builder import SemanticSchemaBuilder
 
-    frame = _load_frame_helper(payload.dataset_id)
+    frame = _load_frame_helper(payload.dataset_id, scope.account_id)
     if frame is None:
-        raise HTTPException(status_code=404, detail=f"Dataset {payload.dataset_id} not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset {payload.dataset_id} not found or unauthorized.",
+        )
 
     schema = SemanticSchemaBuilder.build(frame)
     plan = QueryPlanner.plan(payload.question, schema)
@@ -85,15 +91,21 @@ def execute_analytics_query(payload: QueryRequest) -> dict:
 
 
 @router.post("/plan")
-def plan_analytics_query(payload: PlanRequest) -> dict:
+def plan_analytics_query(
+    payload: PlanRequest,
+    scope: AuthorizedScope = Depends(get_authorized_scope),
+) -> dict[str, Any]:
     """Generate a structured QueryPlan without executing it."""
     from app.analyst.query_planner import QueryPlanner
     from app.analyst.query_validator import QueryValidator
     from app.data.semantic.schema_builder import SemanticSchemaBuilder
 
-    frame = _load_frame_helper(payload.dataset_id)
+    frame = _load_frame_helper(payload.dataset_id, scope.account_id)
     if frame is None:
-        raise HTTPException(status_code=404, detail=f"Dataset {payload.dataset_id} not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset {payload.dataset_id} not found or unauthorized.",
+        )
 
     schema = SemanticSchemaBuilder.build(frame)
     plan = QueryPlanner.plan(payload.question, schema)
@@ -102,16 +114,21 @@ def plan_analytics_query(payload: PlanRequest) -> dict:
 
 
 @router.get("/capabilities/{dataset_id}")
-def get_analytics_capabilities(dataset_id: str) -> dict:
+def get_analytics_capabilities(
+    dataset_id: str,
+    scope: AuthorizedScope = Depends(get_authorized_scope),
+) -> dict[str, Any]:
     """Get dynamic analytics capabilities discovered for dataset."""
     from app.ai.dataset.capability_detector import CapabilityDetector
-    from app.data.semantic.schema_builder import SemanticSchemaBuilder
-    from app.ai.dataset.semantic_mapper import SemanticMapper
     from app.ai.dataset.profiler import DatasetProfiler
+    from app.ai.dataset.semantic_mapper import SemanticMapper
 
-    frame = _load_frame_helper(dataset_id)
+    frame = _load_frame_helper(dataset_id, scope.account_id)
     if frame is None:
-        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset {dataset_id} not found or unauthorized.",
+        )
 
     prof = DatasetProfiler.profile_dataframe(frame)
     mappings = SemanticMapper.map_columns(prof.columns)
@@ -120,4 +137,3 @@ def get_analytics_capabilities(dataset_id: str) -> dict:
         "dataset_id": dataset_id,
         "capabilities": caps,
     }
-

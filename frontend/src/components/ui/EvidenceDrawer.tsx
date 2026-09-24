@@ -1,7 +1,6 @@
 import React from 'react'
-import { X, CheckCircle2, ShieldCheck, Database } from 'lucide-react'
+import { X } from 'lucide-react'
 import { StatusStamp } from './StatusStamp'
-import { cn } from '../../lib/utils'
 
 export interface EvidenceRecord {
   claim: string
@@ -16,6 +15,8 @@ export interface EvidenceRecord {
   calculation?: string
   status?: string
 }
+
+export type EvidenceData = EvidenceRecord
 
 interface EvidenceDrawerProps {
   isOpen: boolean

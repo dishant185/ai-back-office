@@ -17,8 +17,6 @@ export const SystemStatusIndicator: React.FC<{ className?: string }> = ({ classN
   // State derivation
   let statusColor = 'bg-slate-400'
   let statusText = 'Checking connectivity...'
-  let isOperational = false
-
   if (isLoading) {
     statusColor = 'bg-slate-400 animate-pulse'
     statusText = 'Checking system...'
@@ -33,7 +31,6 @@ export const SystemStatusIndicator: React.FC<{ className?: string }> = ({ classN
     if (dbOk && llmOk) {
       statusColor = 'bg-emerald-500'
       statusText = 'Systems Operational'
-      isOperational = true
     } else if (dbOk && (llmStatus === 'not_configured' || !llmOk)) {
       statusColor = 'bg-amber-500'
       statusText = 'AI Offline • Analytics Ready'

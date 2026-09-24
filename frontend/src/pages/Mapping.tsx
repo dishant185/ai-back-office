@@ -30,7 +30,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import type { MappingSuggestion, MappingValidationResult, StandardizedDataset } from '../types/mapping'
 import api from '../services/api'
 
-const fieldCatalog = [
+const defaultFieldCatalog = [
   // HR / Talent
   { key: 'employee_id', label: 'Employee ID', category: 'HR / Talent', description: 'Unique identifier for employee record' },
   { key: 'employee_name', label: 'Employee Name', category: 'HR / Talent', description: 'Full employee legal or preferred name' },
@@ -127,6 +127,26 @@ export default function MappingPage() {
   const [editorSearchQuery, setEditorSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<'mapping' | 'preview'>('mapping')
   const [editorMode, setEditorMode] = useState(false)
+  const [fieldCatalog, setFieldCatalog] = useState(defaultFieldCatalog)
+
+  useEffect(() => {
+    api.get<Array<{ key: string; label: string; category?: string; description?: string }>>('/api/v1/mappings/catalog')
+      .then((res) => {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setFieldCatalog(
+            res.data.map((f) => ({
+              key: f.key,
+              label: f.label || f.key,
+              category: f.category ? f.category.toUpperCase() : 'UNIVERSAL',
+              description: f.description || 'Harmonized field',
+            }))
+          )
+        }
+      })
+      .catch(() => {
+        // Fallback to default catalog
+      })
+  }, [])
 
   const summary = useMemo(() => {
     const mapped = rows.filter((row) => row.target && !row.ignored).length

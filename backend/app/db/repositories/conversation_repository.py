@@ -18,8 +18,9 @@ class ConversationRepository:
         user_id: str,
         dataset_id: str | None = None,
         title: str = "New Analysis",
+        conversation_id: str | None = None,
     ) -> dict[str, Any]:
-        conv_id = f"conv_{uuid.uuid4().hex[:12]}"
+        conv_id = conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         doc = {
             "conversation_id": conv_id,
@@ -39,6 +40,10 @@ class ConversationRepository:
         if account_id:
             query["account_id"] = account_id
         return self.conv_collection.find_one(query)
+
+    def get_by_id(self, conversation_id: str, account_id: str | None = None) -> dict[str, Any] | None:
+        return self.get_conversation(conversation_id=conversation_id, account_id=account_id)
+
 
     def list_conversations(self, account_id: str, limit: int = 50) -> list[dict[str, Any]]:
         return list(

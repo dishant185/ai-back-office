@@ -141,3 +141,19 @@ def get_ai_validation_logs_collection() -> Collection[dict[str, Any]]:
 def get_ai_generation_logs_collection() -> Collection[dict[str, Any]]:
     return get_database()["ai_generation_logs"]
 
+
+def get_processing_jobs_collection() -> Collection[dict[str, Any]]:
+    return get_database()["processing_jobs"]
+
+
+def get_activities_collection() -> Collection[dict[str, Any]]:
+    return get_database()["activities"]
+
+
+def get_workspaces_collection() -> Collection[dict[str, Any]]:
+    return get_database()["workspaces"]
+
+
+def get_workspace_members_collection() -> Collection[dict[str, Any]]:
+    return get_database()["workspace_members"]
+

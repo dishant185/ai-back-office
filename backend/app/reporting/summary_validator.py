@@ -108,6 +108,25 @@ class SummaryValidator:
         "you should discuss",
         "the task is to",
         "review the following",
+        # Issue 3 & 5: Unsupported departmental/organizational structure claims
+        "multiple functional divisions",
+        "multiple departments",
+        "various departments",
+        "functional areas",
+        "organizational units",
+        "encompasses multiple",
+        "departmental structure",
+        "organizational structure",
+        "functional division",
+        "divisional breakdown",
+        # Issue 4: Inflated semantic labels without verification
+        "average tenure within current domain or company",
+        "company tenure",
+        "organizational tenure",
+        "years at company",
+        "total workforce",
+        "departed personnel",
+        "active retained staff",
     ]
 
     HR_SPECIFIC_KEYWORDS: list[str] = [
@@ -136,6 +155,9 @@ class SummaryValidator:
             dynamic_sections = []
         elif isinstance(summary_payload, dict):
             overview_text = summary_payload.get("overview") or summary_payload.get("summary") or summary_payload.get("executive_summary") or ""
+            dataset_ov = summary_payload.get("dataset_overview", "")
+            overall_txt = summary_payload.get("overall", "")
+            highlights_list = summary_payload.get("highlights", [])
             dynamic_sections = summary_payload.get("sections", [])
             sections_dict = {
                 "key_findings": summary_payload.get("key_findings", []),
@@ -146,13 +168,24 @@ class SummaryValidator:
             }
         else:
             overview_text = ""
+            dataset_ov = ""
+            overall_txt = ""
+            highlights_list = []
             sections_dict = {}
             dynamic_sections = []
 
         # Assemble non-redundant full_text for validation
         text_blocks: list[str] = []
-        if overview_text:
+        if dataset_ov and dataset_ov not in text_blocks:
+            text_blocks.append(dataset_ov)
+        if overview_text and overview_text not in text_blocks:
             text_blocks.append(overview_text)
+        if overall_txt and overall_txt not in text_blocks:
+            text_blocks.append(overall_txt)
+        for h in highlights_list:
+            h_text = (h.get("text") or f"{h.get('label')}: {h.get('value')}") if isinstance(h, dict) else str(h)
+            if h_text and h_text not in text_blocks:
+                text_blocks.append(h_text)
         for sec in dynamic_sections:
             if isinstance(sec, dict):
                 c = sec.get("content", "")
@@ -180,8 +213,11 @@ class SummaryValidator:
         # Stage 1: Schema Validation
         # -------------------------------------------------------------
         stage_1_pass = True
-        has_content = bool(overview_text and len(overview_text.strip()) >= 20) or (
-            bool(dynamic_sections) and any(len(s.get("content", "").strip()) >= 20 for s in dynamic_sections if isinstance(s, dict))
+        has_content = (
+            bool(overview_text and len(overview_text.strip()) >= 20)
+            or bool(dataset_ov and len(dataset_ov.strip()) >= 15)
+            or bool(highlights_list and len(highlights_list) > 0)
+            or (bool(dynamic_sections) and any(len(s.get("content", "").strip()) >= 20 for s in dynamic_sections if isinstance(s, dict)))
         )
         if not has_content:
             stage_1_pass = False
@@ -453,7 +489,8 @@ class SummaryValidator:
         # Stage 14: Benchmark & Risk Validation (Rule #8 & #10)
         # -------------------------------------------------------------
         stage_14_pass = True
-        has_benchmarks = bool(evidence.get("benchmarks") or evidence.get("targets"))
+        has_benchmarks = bool(evidence.get("benchmarks"))
+        has_targets = bool(evidence.get("targets"))
         if not has_benchmarks:
             benchmark_matches = re.findall(
                 r"\b(?:(?:industry|market|external|standard|peer)\s+benchmarks?|industry\s+standards?|national\s+average|(?:exceeds?|above|below|better\s+than|worse\s+than)\s+(?:the\s+|standard\s+)?industry|talent\s+loss\s+risk|talent\s+drain\s+risk|flight\s+risk)\b",
@@ -465,7 +502,52 @@ class SummaryValidator:
                 rejection_reasons.append(
                     f"Stage 14 (Benchmark & Risk): Unsupported benchmark or risk claim ('{match_str}'). No verified external benchmark exists in evidence."
                 )
+        if not has_targets:
+            target_matches = re.findall(
+                r"\b(?:against\s+targets?|(?:above|below|versus)\s+target|target\s+(?:achievement|variance))\b",
+                full_lower,
+            )
+            if target_matches:
+                stage_14_pass = False
+                rejection_reasons.append(
+                    f"Stage 14 (Target): Unsupported target claim ('{target_matches[0]}'). No verified target exists in evidence."
+                )
         stage_results["14_benchmark_and_risk"] = stage_14_pass
+
+        # -------------------------------------------------------------
+        # Stage 15: Metric Binding Consistency (No cross-measure mixing)
+        # -------------------------------------------------------------
+        stage_15_pass = True
+        # Check for Education count + Attrition metric mismatch
+        # e.g. "Attrition across Education ranges from 179 to 3,601"
+        for block in text_blocks:
+            block_low = block.lower()
+            if "attrition" in block_low or "turnover" in block_low:
+                # Check for claiming attrition is an integer count (e.g. 179, 3601, 4653)
+                # or ranges across counts without %
+                range_match = re.search(r"attrition[^\.\n]*?(?:ranges?|varies|between)[^\.\n]*?(\d[\d,]*)\s*(?:to|and|-)\s*(\d[\d,]*)", block_low)
+                if range_match:
+                    v1_str, v2_str = range_match.groups()
+                    try:
+                        v1 = float(v1_str.replace(",", ""))
+                        v2 = float(v2_str.replace(",", ""))
+                        if v1 > 100 or v2 > 100:
+                            stage_15_pass = False
+                            rejection_reasons.append(
+                                f"Stage 15 (Metric Binding): Attrition rate cannot be quantified using record counts (found range {v1_str} to {v2_str})."
+                            )
+                    except ValueError:
+                        pass
+
+                # Check for direct claim like "Attrition in Bachelors is 3,601" or "attrition ... 3,601"
+                mismatch_match = re.search(r"attrition[^\.\n]*?(?:is|at|of|reached)\s+(\d{3,}(?:,\d{3})*)(?!\s*%)", block_low)
+                if mismatch_match:
+                    num_s = mismatch_match.group(1)
+                    stage_15_pass = False
+                    rejection_reasons.append(
+                        f"Stage 15 (Metric Binding): Attrition rate cannot be quantified as count value '{num_s}'."
+                    )
+        stage_results["15_metric_binding"] = stage_15_pass
 
         # -------------------------------------------------------------
         # Final Synthesis
@@ -479,6 +561,7 @@ class SummaryValidator:
             and stage_9_pass
             and stage_10_pass
             and stage_14_pass
+            and stage_15_pass
         )
         relevance_verified = stage_1_pass and stage_2_pass and stage_3_pass and stage_11_pass and stage_12_pass and stage_13_pass
         dataset_verified = stage_2_pass

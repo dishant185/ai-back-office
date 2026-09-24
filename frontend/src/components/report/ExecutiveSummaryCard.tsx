@@ -38,10 +38,48 @@ export function ExecutiveSummaryCard({ summary }: ExecutiveSummaryCardProps) {
         </div>
       </CardHeader>
       <CardContent className="pt-4 space-y-4">
-        <p className="text-sm leading-relaxed text-slate-700">{summary.overview}</p>
+        {summary.dataset_overview ? (
+          <div className="space-y-3.5">
+            <p className="text-sm font-medium leading-relaxed text-slate-800">{summary.dataset_overview}</p>
+            {summary.highlights && summary.highlights.length > 0 && (
+              <ul className="space-y-1.5 py-1">
+                {summary.highlights.map((h, i) => {
+                  let label = ''
+                  let val = h
+                  if (h.includes('–')) {
+                    const split = h.split('–')
+                    label = split[0].trim()
+                    val = split.slice(1).join('–').trim()
+                  } else if (h.includes(':')) {
+                    const split = h.split(':')
+                    label = split[0].trim()
+                    val = split.slice(1).join(':').trim()
+                  }
+                  return (
+                    <li key={i} className="flex items-baseline gap-2.5 text-xs sm:text-sm text-slate-700">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600 relative top-[-1px]" />
+                      <span>
+                        {label ? <span className="font-semibold text-slate-900">{label}: </span> : null}
+                        <span>{val}</span>
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            {summary.overall && (
+              <div className="rounded-lg bg-emerald-50/50 border border-emerald-100/80 p-3 text-xs sm:text-sm text-slate-700 leading-relaxed">
+                <span className="font-semibold text-slate-900">Overall: </span>
+                <span>{summary.overall.replace(/^Overall:\s*/, '')}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">{summary.overview}</p>
+        )}
 
         <div className="grid gap-4 md:grid-cols-2">
-          {summary.key_highlights?.length > 0 && (
+          {(!summary.highlights || summary.highlights.length === 0) && summary.key_highlights?.length > 0 && (
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-2">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />

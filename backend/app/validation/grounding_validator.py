@@ -54,12 +54,12 @@ class GroundingValidator:
             return llm_response_text, True, []
 
         # Intent-specific grounding checks
-        if verified.intent == "DISTRIBUTION":
-            dist = verified.result.get("distribution", [])
+        if verified.intent in ("DISTRIBUTION", "SHARE") and ("distribution" in verified.result or "breakdown" in verified.result):
+            dist = verified.result.get("distribution") or verified.result.get("breakdown", [])
             if not dist:
                 return llm_response_text, True, []
-            valid_counts = {float(item.get("count", 0)) for item in dist}
-            valid_percentages = {float(item.get("percentage", 0)) for item in dist}
+            valid_counts = {float(item.get("count", item.get("value", 0))) for item in dist}
+            valid_percentages = {float(item.get("percentage", item.get("share", 0))) for item in dist}
             valid_numbers = valid_counts | valid_percentages
             text_numbers = _extract_numbers(llm_response_text)
             # Verify that major numbers in text belong to distribution
@@ -69,7 +69,7 @@ class GroundingValidator:
                 return fallback, False, ["Distribution numbers mismatch in LLM text."]
             return llm_response_text, True, []
 
-        if verified.intent in ("COMPARISON", "SUMMARY", "RECOMMENDATION", "TREND"):
+        if verified.intent in ("COMPARISON", "SUMMARY", "RECOMMENDATION", "TREND", "CAUSAL_EXPLANATION", "MISSING_DATA_AUDIT"):
             return llm_response_text, True, []
 
         verified_val = verified.get_value()

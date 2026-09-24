@@ -74,6 +74,21 @@ class BenchmarkValidator:
                         f"Unsupported Benchmark: Claimed comparison '{match.group(0)}' without verified external benchmark data in evidence."
                     )
 
+        # If no verified targets exist, prohibit target-based language (Bug 3)
+        has_targets = bool(evidence.get("targets"))
+        if not has_targets:
+            for pat in [
+                re.compile(r"\b(?:against|above|below|versus|vs\.?)\s+(?:the\s+)?targets?\b", re.IGNORECASE),
+                re.compile(r"\btarget\s+(?:achievement|variance|value|benchmark)\b", re.IGNORECASE),
+                re.compile(r"\bagainst\s+targets?\b", re.IGNORECASE),
+            ]:
+                match = pat.search(summary_text)
+                if match:
+                    result.is_valid = False
+                    result.violations.append(
+                        f"Unsupported Target: Claimed '{match.group(0)}' without verified target evidence."
+                    )
+
         return result
 
     @classmethod

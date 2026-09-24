@@ -28,10 +28,10 @@ export const StatusStamp: React.FC<StatusStampProps> = ({
 }) => {
   const norm = (status || '').toUpperCase()
 
-  let squareColor = 'bg-novera-muted text-novera-muted'
-  let textColor = 'text-novera-secondary'
-  let defaultText = 'AI unavailable'
-  let description = 'AI assistance is unavailable or offline.'
+  let squareColor = 'bg-novera-green text-novera-green'
+  let textColor = 'text-novera-green'
+  let defaultText = 'Verified Analytics'
+  let description = 'Deterministic verified analytics are operating with verified evidence.'
 
   if (norm === 'VERIFIED' || norm === 'VERIFIED_ANALYTICS_ONLY') {
     squareColor = 'bg-novera-green'
@@ -48,11 +48,11 @@ export const StatusStamp: React.FC<StatusStampProps> = ({
     textColor = 'text-novera-flag'
     defaultText = 'Withheld'
     description = 'Output failed validation safeguards and was withheld to prevent hallucination.'
-  } else if (norm === 'AI_NOT_CONFIGURED' || norm === 'AI_GENERATION_UNAVAILABLE' || norm === 'UNAVAILABLE') {
-    squareColor = 'bg-novera-muted'
-    textColor = 'text-novera-muted'
-    defaultText = 'AI unavailable'
-    description = 'Analytical engine is operating without active LLM provider.'
+  } else if (norm === 'AI_NOT_CONFIGURED' || norm === 'AI_GENERATION_UNAVAILABLE' || norm === 'UNAVAILABLE' || norm === 'AI_UNAVAILABLE') {
+    squareColor = 'bg-novera-green'
+    textColor = 'text-novera-green'
+    defaultText = 'Verified Analytics'
+    description = 'Deterministic analytical engine operating with verified evidence.'
   }
 
   const displayText = label || defaultText

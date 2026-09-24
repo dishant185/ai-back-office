@@ -27,6 +27,7 @@ import { StatCardSkeleton, TableSkeleton } from '../components/ui/Skeleton'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { ErrorBoundary } from '../components/ui/ErrorBoundary'
+import { useAuth } from '../context/AuthContext'
 import { reportService } from '../services/reportService'
 import api from '../services/api'
 import type { ReportSummaryItem } from '../types/report'
@@ -87,6 +88,8 @@ function timeAgo(isoString: string | null | undefined): string {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const firstName = user?.name ? user.name.split(' ')[0] : 'Analyst'
 
   const {
     data: reports = [],
@@ -95,8 +98,9 @@ export default function Dashboard() {
     error: reportsError,
     refetch: refetchReports,
   } = useQuery<ReportSummaryItem[]>({
-    queryKey: ['dashboard-reports'],
+    queryKey: ['dashboard-reports', user?.id],
     queryFn: () => reportService.listReports(),
+    enabled: !!user,
   })
 
   const {
@@ -106,14 +110,15 @@ export default function Dashboard() {
     error: statsError,
     refetch: refetchStats,
   } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats'],
+    queryKey: ['dashboard-stats', user?.id],
     queryFn: async () => {
       const response = await api.get<DashboardStats>('/api/v1/dashboard/stats')
       return response.data
     },
+    enabled: !!user,
   })
 
-  const totalRecords = stats?.total_records || reports.reduce((acc, r) => acc + (r.row_count || 0), 0)
+  const totalRecords = stats?.total_records ?? 0
 
   return (
     <ErrorBoundary fallbackTitle="Dashboard Error">
@@ -128,7 +133,7 @@ export default function Dashboard() {
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="flex items-center gap-1.5 rounded-full border border-brand-400/30 bg-brand-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-300">
                 <Sparkles className="h-3.5 w-3.5 text-brand-400" />
-                Executive Copilot Command
+                Welcome, {firstName}
               </span>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -137,8 +142,9 @@ export default function Dashboard() {
             </div>
 
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-tight">
-              Operational Intelligence &amp; Autonomous Back-Office
+              Operational Intelligence &bull; {user?.organization || 'Enterprise Hub'}
             </h1>
+
 
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
               Synthesize executive-grade analytics from raw spreadsheets in seconds. Zero hallucinations,
@@ -212,12 +218,18 @@ export default function Dashboard() {
                 </div>
               </div>
               <p className="mt-3 text-2xl sm:text-3xl font-black text-text-primary tracking-tight">
-                {totalRecords > 0 ? totalRecords.toLocaleString() : '0'}
+                {totalRecords.toLocaleString()}
               </p>
-              <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
-                <TrendingUp className="h-3.5 w-3.5" />
-                <span>100% Deterministic Integrity</span>
-              </div>
+              {totalRecords > 0 ? (
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  <span>100% Deterministic Integrity</span>
+                </div>
+              ) : (
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-400 font-medium">
+                  <span>No processed data yet</span>
+                </div>
+              )}
             </CardContent>
           </Card>
 

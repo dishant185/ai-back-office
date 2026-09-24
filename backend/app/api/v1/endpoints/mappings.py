@@ -1,9 +1,14 @@
+"""Data mapping endpoints with strict multi-tenant authorization."""
+from __future__ import annotations
+
 import datetime
 from typing import Any
-from fastapi import APIRouter, Depends
 
-from app.core.deps import get_optional_user
-from app.db.mongodb import get_mappings_collection
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.core.deps import AuthorizedScope, get_authorized_scope
+from app.db.database import get_datasets_collection, get_mappings_collection
+from app.db.repositories.dataset_repository import DatasetRepository
 from app.schemas.mapping import (
     MappingApplyResponse,
     MappingRequest,
@@ -14,6 +19,13 @@ from app.schemas.mapping import (
 from app.services.mapping_service import MappingService
 
 router = APIRouter()
+
+
+@router.get("/catalog")
+def get_field_catalog() -> list[dict[str, Any]]:
+    """Returns the full standardized field catalog across all business domains."""
+    from app.data.mapping.schema import STANDARD_SCHEMA
+    return [field.to_dict() for field in STANDARD_SCHEMA.values()]
 
 
 @router.post("/suggest", response_model=MappingSuggestResponse)
@@ -33,8 +45,14 @@ def validate_mappings(payload: MappingValidationRequest) -> MappingValidateRespo
 @router.post("/apply", response_model=MappingApplyResponse)
 def apply_mappings(
     payload: MappingValidationRequest,
-    current_user: dict[str, Any] | None = Depends(get_optional_user),
+    scope: AuthorizedScope = Depends(get_authorized_scope),
 ) -> MappingApplyResponse:
+    # Verify dataset ownership
+    repo = DatasetRepository()
+    ds_doc = repo.get_by_id(payload.upload_id, account_id=scope.account_id)
+    if not ds_doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found or unauthorized.")
+
     service = MappingService()
     validation = service.validate([item.model_dump() for item in payload.mappings])
 
@@ -51,23 +69,37 @@ def apply_mappings(
             audit={"status": "needs_review", "errors": result["audit"]["errors"]},
         )
 
-    # Persist mapping to MongoDB user-wise
-    user_id = str(current_user.get("id")) if current_user else "guest"
+    # Persist mapping to MongoDB scoped to current account
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     try:
         mappings_col = get_mappings_collection()
         mappings_col.update_one(
-            {"upload_id": payload.upload_id, "user_id": user_id},
+            {"upload_id": payload.upload_id, "account_id": scope.account_id},
             {
                 "$set": {
                     "upload_id": payload.upload_id,
-                    "user_id": user_id,
+                    "dataset_id": payload.upload_id,
+                    "account_id": scope.account_id,
+                    "user_id": scope.user_id,
+                    "workspace_id": scope.workspace_id,
                     "mappings": [item.model_dump() for item in payload.mappings],
                     "mapping_summary": result["mapping_summary"],
                     "updated_at": now_iso,
                 }
             },
             upsert=True,
+        )
+
+        from app.services.audit_service import log_audit_event
+        log_audit_event(
+            account_id=scope.account_id,
+            workspace_id=scope.workspace_id,
+            user_id=scope.user_id,
+            action="MAPPING_UPDATED",
+            resource_type="mapping",
+            resource_id=payload.upload_id,
+            status="SUCCESS",
+            details=result["mapping_summary"],
         )
     except Exception as err:
         import logging
@@ -93,29 +125,18 @@ def apply_mappings(
 
 @router.get("/list")
 def list_mappings(
-    current_user: dict[str, Any] | None = Depends(get_optional_user),
+    scope: AuthorizedScope = Depends(get_authorized_scope),
 ) -> list[dict[str, Any]]:
-    """Returns all datasets as mapping cards for the current user/account."""
-    user_id = str(current_user.get("id")) if current_user else "guest"
-    account_id = str(current_user.get("account_id")) if current_user and current_user.get("account_id") else "account_default"
+    """Returns all datasets as mapping cards strictly scoped to the authenticated tenant."""
     try:
         mappings_col = get_mappings_collection()
-        saved_cursor = mappings_col.find({"$or": [{"user_id": user_id}, {"account_id": account_id}]}).sort("updated_at", -1)
+        saved_cursor = mappings_col.find({"account_id": scope.account_id}).sort("updated_at", -1)
         saved_by_id: dict[str, dict[str, Any]] = {doc["upload_id"]: doc for doc in saved_cursor if doc.get("upload_id")}
 
-        # Fetch all datasets from uploads and datasets collections
-        from app.db.mongodb import get_uploads_collection
-        from app.db.database import get_datasets_collection
-        uploads_col = get_uploads_collection()
+        # Fetch only datasets belonging to current account
         datasets_col = get_datasets_collection()
-
         all_uploads: dict[str, dict[str, Any]] = {}
-        for doc in uploads_col.find({"$or": [{"user_id": user_id}, {"account_id": account_id}]}).sort("created_at", -1):
-            uid = doc.get("upload_id")
-            if uid and uid not in all_uploads:
-                all_uploads[uid] = doc
-
-        for doc in datasets_col.find({"$or": [{"user_id": user_id}, {"account_id": account_id}]}).sort("created_at", -1):
+        for doc in datasets_col.find({"account_id": scope.account_id}).sort("created_at", -1):
             uid = doc.get("dataset_id") or doc.get("upload_id")
             if uid and uid not in all_uploads:
                 all_uploads[uid] = doc
@@ -176,16 +197,11 @@ def list_mappings(
 @router.get("/{upload_id}")
 def get_mapping_by_id(
     upload_id: str,
-    current_user: dict[str, Any] | None = Depends(get_optional_user),
+    scope: AuthorizedScope = Depends(get_authorized_scope),
 ) -> dict[str, Any]:
-    """Get saved column mappings for a specific dataset/upload."""
-    user_id = str(current_user.get("id")) if current_user else "guest"
-    account_id = str(current_user.get("account_id")) if current_user and current_user.get("account_id") else "account_default"
+    """Get saved column mappings for a specific dataset strictly scoped to the tenant."""
     mappings_col = get_mappings_collection()
-    doc = mappings_col.find_one({"upload_id": upload_id, "$or": [{"user_id": user_id}, {"account_id": account_id}]})
-    if not doc:
-        # Check without user filter for guest
-        doc = mappings_col.find_one({"upload_id": upload_id})
+    doc = mappings_col.find_one({"upload_id": upload_id, "account_id": scope.account_id})
     if doc:
         return {
             "upload_id": upload_id,
@@ -193,10 +209,15 @@ def get_mapping_by_id(
             "mapping_summary": doc.get("mapping_summary", {}),
             "updated_at": doc.get("updated_at"),
         }
+
+    # Verify if the dataset at least belongs to this account
+    repo = DatasetRepository()
+    ds_doc = repo.get_by_id(upload_id, account_id=scope.account_id)
+    if not ds_doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset mapping not found.")
+
     return {
         "upload_id": upload_id,
         "mappings": [],
         "mapping_summary": {},
     }
-
-

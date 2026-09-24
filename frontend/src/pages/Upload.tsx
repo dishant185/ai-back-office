@@ -22,6 +22,7 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import { PageHeader } from '../components/ui/PageHeader'
 import { StatCard } from '../components/ui/StatCard'
 import api from '../services/api'
+import { queryClient } from '../lib/queryClient'
 import type { DatasetSummary, UploadResult } from '../types/mapping'
 
 const MAX_FILE_SIZE_MB = 25
@@ -134,6 +135,9 @@ export default function UploadPage() {
         }),
       )
       setUploadState('success')
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] })
+
 
       if (readWorkflowIntent() === 'report_generation') {
         navigate(`/mapping/${result.upload_id}`)

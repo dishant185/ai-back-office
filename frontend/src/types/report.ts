@@ -117,6 +117,10 @@ export interface DynamicSummarySectionData {
 
 export interface ExecutiveSummary {
   overview: string
+  dataset_overview?: string
+  highlights?: string[]
+  overall?: string
+  evidence_ids?: string[]
   summary?: string
   sections?: DynamicSummarySectionData[]
   key_highlights: string[]

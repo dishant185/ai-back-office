@@ -35,7 +35,7 @@ export const SummaryHeader: React.FC<SummaryHeaderProps> = ({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
-              AI Executive Summary
+              {status?.toUpperCase() === 'AI_GENERATED_GROUNDED' ? 'AI Executive Summary' : 'Verified Analytics Summary'}
             </span>
             <AIStatusBadge status={status} />
           </div>

@@ -80,7 +80,7 @@ def build_report_context(
         dataset_meta.get("filename")
         or report_payload.get("filename")
         or report_payload.get("dataset_name")
-        or "dataset.csv"
+        or "the uploaded dataset"
     )
     d_profile = (
         report_payload.get("domain")

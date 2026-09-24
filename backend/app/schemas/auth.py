@@ -34,6 +34,8 @@ class UserProfileUpdateRequest(BaseModel):
 
 class UserResponse(BaseModel):
     id: str
+    account_id: str | None = None
+    workspace_id: str | None = "default"
     email: str
     name: str
     title: str = "Business Analyst"
@@ -48,6 +50,7 @@ class UserResponse(BaseModel):
     report_tone: str = "executive"
     auto_standardize: bool = True
     created_at: str | None = None
+
 
 
 class TokenResponse(BaseModel):

@@ -108,20 +108,29 @@ def init_indexes() -> None:
         _safe_create_index(get_ai_validation_logs_collection(), [("account_id", ASCENDING), ("created_at", DESCENDING)])
         _safe_create_index(get_ai_generation_logs_collection(), [("account_id", ASCENDING), ("created_at", DESCENDING)])
 
+        # Audit Logs
+        audit_col = get_audit_logs_collection()
+        _safe_create_index(audit_col, [("audit_id", ASCENDING)], unique=True)
+        _safe_create_index(audit_col, [("account_id", ASCENDING), ("created_at", DESCENDING)])
+        _safe_create_index(audit_col, [("account_id", ASCENDING), ("action", ASCENDING)])
+
+        # Processing Jobs
+        from app.db.database import get_processing_jobs_collection
+        jobs_col = get_processing_jobs_collection()
+        _safe_create_index(jobs_col, [("job_id", ASCENDING)], unique=True)
+        _safe_create_index(jobs_col, [("account_id", ASCENDING), ("created_at", DESCENDING)])
+        _safe_create_index(jobs_col, [("status", ASCENDING), ("heartbeat_at", ASCENDING)])
+
+        # Mappings
+        mappings = get_mappings_collection()
+        _safe_create_index(mappings, [("upload_id", ASCENDING)])
+        _safe_create_index(mappings, [("account_id", ASCENDING)])
+
         # Compound Tenant / Account indexes across primary collections
         for col in [datasets, schemas, knowledge, conversations, messages, reports]:
             _safe_create_index(col, [("tenant_id", ASCENDING), ("account_id", ASCENDING)])
 
         logger.info("MongoDB multi-tenant indexes verified successfully.")
-    except Exception as exc:
-        logger.warning("Failed to initialize some MongoDB indexes: %s", exc)
-
-        # Mappings (legacy)
-        mappings = get_mappings_collection()
-        mappings.create_index([("upload_id", ASCENDING)])
-        mappings.create_index([("user_id", ASCENDING)])
-
-        logger.info("MongoDB indexes verified successfully.")
     except Exception as exc:
         logger.warning("Failed to initialize some MongoDB indexes: %s", exc)
 

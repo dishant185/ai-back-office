@@ -27,7 +27,9 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import { PageHeader } from '../components/ui/PageHeader'
 import api from '../services/api'
 import { reportService } from '../services/reportService'
+import { queryClient } from '../lib/queryClient'
 import type { ReportResponse, ReportSummaryItem } from '../types/report'
+
 
 // Domain color/icon mapping
 const domainStyles: Record<string, { color: string; bg: string; border: string; icon: typeof BarChart3 }> = {
@@ -173,6 +175,9 @@ export default function Reports() {
       setReport(generated)
       setSearchParams({ reportId: generated.report_id })
       await fetchHistory()
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] })
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+
     } catch (err: any) {
       console.error('Failed to load/generate report:', err)
       setError(
@@ -258,7 +263,10 @@ export default function Reports() {
     try {
       await reportService.deleteReport(reportId)
       await fetchHistory()
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] })
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       if (activeReportId === reportId) {
+
         handleBackToList()
       }
     } catch (err: any) {

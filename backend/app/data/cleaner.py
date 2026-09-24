@@ -1,35 +1,32 @@
 from __future__ import annotations
 
 import pandas as pd
+from app.data.universal_cleaner import UniversalDataCleaner, CleaningAuditSummary, CleaningPreview
 
 
 class DataCleaner:
-    """Apply conservative, reversible text and row cleanup to tabular datasets."""
+    """Apply conservative, reversible text and row cleanup to tabular datasets.
+    
+    Maintains backward compatibility while delegating to UniversalDataCleaner.
+    """
+
+    def __init__(self) -> None:
+        self.last_audit: CleaningAuditSummary | None = None
 
     def clean(self, frame: pd.DataFrame) -> pd.DataFrame:
-        cleaned = frame.copy()
+        cleaned_df, audit = UniversalDataCleaner.clean(
+            frame,
+            actions=[
+                "trim_whitespace",
+                "normalize_nulls",
+                "standardize_casing",
+                "parse_currencies",
+                "parse_percentages",
+                "normalize_booleans",
+            ],
+        )
+        self.last_audit = audit
+        return cleaned_df
 
-        for column in cleaned.columns:
-            if pd.api.types.is_object_dtype(cleaned[column]) or pd.api.types.is_string_dtype(cleaned[column]):
-                cleaned[column] = cleaned[column].map(self._clean_text_value)
-                cleaned[column] = cleaned[column].apply(self._normalize_text)
-
-        cleaned = cleaned.replace(r"^\s*$", pd.NA, regex=True)
-        cleaned = cleaned.dropna(axis=0, how="all").reset_index(drop=True)
-
-        return cleaned
-
-    def _clean_text_value(self, value: object) -> object:
-        if pd.isna(value):
-            return value
-        if isinstance(value, str):
-            return value.strip()
-        return value
-
-    def _normalize_text(self, value: object) -> object:
-        if pd.isna(value):
-            return value
-        if isinstance(value, str):
-            normalized = value.strip()
-            return normalized[:1].upper() + normalized[1:].lower() if normalized else normalized
-        return value
+    def preview_issues(self, frame: pd.DataFrame, dataset_id: str = "dataset") -> CleaningPreview:
+        return UniversalDataCleaner.preview_issues(frame, dataset_id=dataset_id)

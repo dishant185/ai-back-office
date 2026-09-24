@@ -99,6 +99,26 @@ class ChartBuilder:
         )
 
     @classmethod
+    def ranking_bar(
+        cls,
+        frame: pd.DataFrame,
+        group_col: str,
+        metric_col: str,
+        title: str,
+        chart_id: str,
+        max_groups: int = 8,
+    ) -> ChartDefinition | None:
+        return cls.group_metric_comparison(
+            frame=frame,
+            group_col=group_col,
+            metric_col=metric_col,
+            title=title,
+            chart_id=chart_id,
+            agg="sum",
+            max_groups=max_groups,
+        )
+
+    @classmethod
     def rate_by_category(
         cls,
         frame: pd.DataFrame,

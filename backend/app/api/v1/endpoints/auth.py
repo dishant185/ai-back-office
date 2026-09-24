@@ -21,8 +21,14 @@ router = APIRouter()
 
 
 def _format_user_response(user_doc: dict[str, Any]) -> UserResponse:
+    user_id = str(user_doc.get("id") or user_doc.get("user_id"))
+    raw_acc = user_doc.get("account_id")
+    account_id = str(raw_acc) if raw_acc else f"acc_{user_id[4:] if user_id.startswith('usr_') else user_id}"
+    workspace_id = str(user_doc.get("workspace_id") or "default")
     return UserResponse(
-        id=str(user_doc.get("id")),
+        id=user_id,
+        account_id=account_id,
+        workspace_id=workspace_id,
         email=str(user_doc.get("email")),
         name=str(user_doc.get("name")),
         title=str(user_doc.get("title", "Business Analyst")),
@@ -53,10 +59,15 @@ def register(payload: UserRegisterRequest) -> TokenResponse:
         )
 
     user_id = f"usr_{uuid.uuid4().hex[:12]}"
+    account_id = f"acc_{uuid.uuid4().hex[:12]}"
+    workspace_id = "default"
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
     user_doc = {
         "id": user_id,
+        "user_id": user_id,
+        "account_id": account_id,
+        "workspace_id": workspace_id,
         "email": normalized_email,
         "hashed_password": hash_password(payload.password),
         "name": payload.name.strip(),
@@ -72,7 +83,41 @@ def register(payload: UserRegisterRequest) -> TokenResponse:
 
     users.insert_one(user_doc)
 
+    try:
+        from app.db.database import get_accounts_collection
+        accounts = get_accounts_collection()
+        accounts.update_one(
+            {"account_id": account_id},
+            {
+                "$set": {
+                    "account_id": account_id,
+                    "name": payload.organization or f"{payload.name.strip()}'s Workspace",
+                    "owner_user_id": user_id,
+                    "created_at": now_iso,
+                    "updated_at": now_iso,
+                }
+            },
+            upsert=True,
+        )
+    except Exception:
+        pass
+
     token = create_access_token({"sub": user_id, "email": normalized_email})
+
+    try:
+        from app.services.audit_service import log_audit_event
+        log_audit_event(
+            account_id=account_id,
+            action="USER_REGISTER",
+            user_id=user_id,
+            resource_type="user",
+            resource_id=user_id,
+            status="SUCCESS",
+            details={"email": normalized_email, "organization": payload.organization},
+        )
+    except Exception:
+        pass
+
     return TokenResponse(
         access_token=token,
         token_type="bearer",
@@ -92,6 +137,17 @@ def login(payload: UserLoginRequest, request: Request) -> TokenResponse:
     user = users.find_one({"email": normalized_email})
     if not user or not verify_password(payload.password, user.get("hashed_password", "")):
         login_rate_limiter.record_failure(ip, normalized_email)
+        try:
+            from app.services.audit_service import log_audit_event
+            log_audit_event(
+                account_id="unauthenticated",
+                action="USER_LOGIN_FAILED",
+                status="DENIED",
+                details={"email": normalized_email},
+                ip_address=ip,
+            )
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password. Please verify your credentials.",
@@ -102,6 +158,23 @@ def login(payload: UserLoginRequest, request: Request) -> TokenResponse:
 
     user_id = str(user.get("id"))
     token = create_access_token({"sub": user_id, "email": normalized_email})
+
+    try:
+        from app.services.audit_service import log_audit_event
+        user_acc = user.get("account_id") or f"acc_{user_id[4:] if user_id.startswith('usr_') else user_id}"
+        log_audit_event(
+            account_id=user_acc,
+            action="USER_LOGIN",
+            user_id=user_id,
+            resource_type="user",
+            resource_id=user_id,
+            status="SUCCESS",
+            details={"email": normalized_email},
+            ip_address=ip,
+        )
+    except Exception:
+        pass
+
     return TokenResponse(
         access_token=token,
         token_type="bearer",

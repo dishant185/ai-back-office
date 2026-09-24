@@ -84,13 +84,17 @@ class Settings:
         self.jwt_algorithm = "HS256"
         self.jwt_access_token_expire_minutes = 60 * 24 * 7  # 7 days
 
-        # External LLM Provider Settings
-        self.ai_enabled = os.getenv("AI_ENABLED", "true").lower() in ("true", "1", "yes")
-        self.llm_provider = os.getenv("LLM_PROVIDER", os.getenv("AI_PROVIDER", "generic")).lower()
-        self.llm_api_key = os.getenv("LLM_API_KEY", os.getenv("OPENAI_API_KEY", ""))
-        self.llm_model = os.getenv("LLM_MODEL", os.getenv("LOCAL_AI_MODEL", "gpt-4o-mini"))
-        self.llm_base_url = os.getenv("LLM_BASE_URL", os.getenv("LOCAL_AI_BASE_URL", "http://127.0.0.1:8080/v1"))
-        self.llm_timeout = int(os.getenv("LLM_TIMEOUT", os.getenv("LOCAL_AI_TIMEOUT", "60")))
+        # External LLM Provider Settings (Section 20)
+        self.ai_enabled = os.getenv("AI_REPORT_ENABLED", os.getenv("AI_ENABLED", "true")).lower() in ("true", "1", "yes")
+        self.llm_provider = os.getenv("AI_PROVIDER", os.getenv("LLM_PROVIDER", "generic")).lower()
+        self.llm_api_key = os.getenv("OPENAI_API_KEY", os.getenv("LLM_API_KEY", ""))
+        self.llm_model = os.getenv("OPENAI_MODEL", os.getenv("LLM_MODEL", os.getenv("LOCAL_AI_MODEL", "gpt-4o-mini")))
+        self.llm_base_url = os.getenv("LLM_BASE_URL", os.getenv("LOCAL_AI_BASE_URL", "https://api.openai.com/v1"))
+        self.llm_timeout = int(os.getenv("AI_TIMEOUT_SECONDS", os.getenv("LLM_TIMEOUT", os.getenv("LOCAL_AI_TIMEOUT", "60"))))
+        self.ai_temperature = float(os.getenv("AI_TEMPERATURE", "0.1"))
+        self.ai_max_output_tokens = int(os.getenv("AI_MAX_OUTPUT_TOKENS", "2048"))
+        self.ai_claim_validation_enabled = os.getenv("AI_CLAIM_VALIDATION_ENABLED", "true").lower() in ("true", "1", "yes")
+        self.ai_report_prompt_version = os.getenv("AI_REPORT_PROMPT_VERSION", "1.0")
 
         # Legacy MongoDB compatibility flag
         self.mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Bell, Command, Menu, Moon, Search, Sun, ShieldCheck } from 'lucide-react'
+import { Bell, Menu, Moon, Search, Sun, ShieldCheck } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { CommandSearch } from '../ui/CommandSearch'
+import { ProfileAvatar } from '../ui/ProfileAvatar'
 
 interface HeaderProps {
   onMenuClick?: () => void
@@ -31,15 +32,6 @@ export function Header({ onMenuClick }: HeaderProps) {
     section: 'Workspace',
     title: 'Business Pulse',
   }
-
-  const userInitials = user?.name
-    ? user.name
-        .split(' ')
-        .map((w) => w[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'NV'
 
   const toggleTheme = () => {
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
@@ -134,11 +126,11 @@ export function Header({ onMenuClick }: HeaderProps) {
           {/* Profile link */}
           <Link
             to="/profile"
-            className="flex h-8 w-8 items-center justify-center rounded-[2px] bg-novera-deep text-novera-green-light font-mono text-xs font-bold border border-novera-rule/50 dark:border-white/10 hover:border-novera-green transition"
+            className="flex items-center transition hover:opacity-90 cursor-pointer"
             aria-label="User profile"
             title={user?.name || 'Profile'}
           >
-            {userInitials}
+            <ProfileAvatar name={user?.name} size="md" />
           </Link>
         </div>
       </header>

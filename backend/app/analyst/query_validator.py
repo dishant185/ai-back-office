@@ -68,6 +68,14 @@ class QueryValidator:
                     plan.unavailable_reason = f"Measure '{plan.measure}' was not found in dataset schema."
                     return plan
 
+            # Ensure identifier fields are never used as aggregated business measures
+            if plan.aggregation and plan.aggregation.upper() not in ("COUNT", "COUNT_DISTINCT"):
+                col_obj = schema.get_column(plan.measure)
+                if col_obj and col_obj.role == "identifier":
+                    plan.status = "REJECTED"
+                    plan.unavailable_reason = f"Identifier '{plan.measure}' cannot be aggregated using {plan.aggregation}."
+                    return plan
+
         # Validate aggregation function
         if plan.aggregation:
             valid_aggs = {"SUM", "AVG", "AVERAGE", "MIN", "MINIMUM", "MAX", "MAXIMUM", "MEDIAN", "COUNT"}

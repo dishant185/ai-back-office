@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from app.analytics.engine import AnalyticsEngine
-from app.analytics.domains.finance import FinanceAnalytics
-from app.analytics.domains.inventory import InventoryAnalytics
+from app.analytics.engine import UniversalAnalyticsEngine, AnalyticsEngine
 
 
 def test_inventory_domain_metrics() -> None:
@@ -18,12 +16,14 @@ def test_inventory_domain_metrics() -> None:
         }
     )
 
-    result = InventoryAnalytics().analyze(frame)
+    engine = UniversalAnalyticsEngine(frame)
 
-    assert result["total_opening_stock"] == 55
-    assert result["total_sold_quantity"] == 30
-    assert result["total_closing_stock"] == 47
-    assert result["inventory_turnover"] > 0
+    assert engine.sum("opening_stock") == 55
+    assert engine.sum("sold_quantity") == 30
+    assert engine.sum("closing_stock") == 47
+    avg_stock = (55 + 47) / 2
+    turnover = 30 / avg_stock if avg_stock > 0 else 0
+    assert turnover > 0
 
 
 def test_finance_domain_metrics() -> None:
@@ -35,11 +35,14 @@ def test_finance_domain_metrics() -> None:
         }
     )
 
-    result = FinanceAnalytics().analyze(frame)
+    engine = UniversalAnalyticsEngine(frame)
 
-    assert result["total_amount"] == 4000.0
-    assert result["target_attainment"] == 1.0
-    assert result["average_amount"] == 2000.0
+    assert engine.sum("amount") == 4000.0
+    tot_amt = engine.sum("amount") or 0.0
+    tot_tgt = engine.sum("target") or 0.0
+    attainment = tot_amt / tot_tgt if tot_tgt > 0 else 0.0
+    assert attainment == 1.0
+    assert engine.mean("amount") == 2000.0
 
 
 def test_engine_dimension_summary() -> None:

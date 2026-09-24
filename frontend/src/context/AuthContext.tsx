@@ -1,8 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import api from '../services/api'
+import { queryClient } from '../lib/queryClient'
 
 export interface AuthUser {
   id: string
+  account_id?: string | null
+  workspace_id?: string | null
   email: string
   name: string
   title: string
@@ -13,6 +16,7 @@ export interface AuthUser {
   bio?: string | null
   created_at?: string | null
 }
+
 
 interface AuthState {
   user: AuthUser | null
@@ -105,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.post('/api/v1/auth/login', { email, password })
     const { access_token, user } = response.data
 
+    queryClient.clear()
     localStorage.setItem(TOKEN_KEY, access_token)
     localStorage.setItem(USER_KEY, JSON.stringify(user))
     setState({ user, token: access_token, isAuthenticated: true, isLoading: false })
@@ -114,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.post('/api/v1/auth/register', data)
     const { access_token, user } = response.data
 
+    queryClient.clear()
     localStorage.setItem(TOKEN_KEY, access_token)
     localStorage.setItem(USER_KEY, JSON.stringify(user))
     setState({ user, token: access_token, isAuthenticated: true, isLoading: false })
@@ -122,8 +128,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
+    queryClient.clear()
     setState({ user: null, token: null, isAuthenticated: false, isLoading: false })
   }
+
 
   const updateUser = (user: AuthUser) => {
     localStorage.setItem(USER_KEY, JSON.stringify(user))

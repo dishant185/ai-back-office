@@ -74,7 +74,14 @@ class QueryPlan(BaseModel):
     filter_val: Any = None
     sort: str | None = "DESC"       # ASC, DESC
     limit: int = 10
+    rank: int = 1
     entities: list[str] = Field(default_factory=list)
+    confidence: float = 1.0
+    time_dimension: str | None = None
+    time_range: str | None = None
+    comparison: str | None = None
+    calculation: str | None = None
+    execution_path: str = "FAST"  # FAST, NLP, LLM
     clarification_question: str | None = None
     unavailable_reason: str | None = None
 

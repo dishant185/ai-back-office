@@ -12,6 +12,10 @@ export interface ExecutiveSummaryProps {
   summaryData?: {
     title?: string
     overview?: string | { text: string; evidence_ids?: string[] }
+    dataset_overview?: string
+    highlights?: string[]
+    overall?: string
+    evidence_ids?: string[]
     sections?: Array<{
       section_id?: string
       title: string
@@ -74,6 +78,9 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({
   const {
     title = reportTitle ? `${reportTitle} Executive Summary` : 'AI Executive Summary',
     overview,
+    dataset_overview,
+    highlights,
+    overall,
     sections = [],
     recommendations = [],
     limitations = [],
@@ -149,8 +156,14 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({
 
         {isExpanded && (
           <CardContent className="pt-4 space-y-3.5">
-            {/* Short Executive Overview */}
-            <SummaryOverview overviewText={overviewText} evidenceIds={overviewEids} />
+            {/* Short Executive Overview (Universal Sales-Style 3-part layout) */}
+            <SummaryOverview
+              overviewText={overviewText}
+              evidenceIds={overviewEids}
+              datasetOverview={dataset_overview}
+              highlights={highlights}
+              overall={overall}
+            />
 
             {/* Dynamic Sections in evidence-derived order */}
             {visibleSections.length > 0 && (

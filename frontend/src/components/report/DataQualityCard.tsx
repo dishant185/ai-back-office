@@ -34,7 +34,7 @@ export function DataQualityCard({ quality }: DataQualityCardProps) {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
             <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              Completeness
+              Field Completeness
             </span>
             <div className="mt-1 text-lg font-bold text-slate-900">
               {quality.completeness_pct ?? 100}%
@@ -54,6 +54,11 @@ export function DataQualityCard({ quality }: DataQualityCardProps) {
             </span>
             <div className="mt-1 text-lg font-bold text-slate-900">
               {(quality.duplicate_rows ?? 0).toLocaleString()}
+              {quality.duplicate_pct != null && quality.duplicate_rows > 0 ? (
+                <span className="text-xs font-normal text-slate-500 ml-1.5">
+                  ({quality.duplicate_pct.toFixed(1)}%)
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">

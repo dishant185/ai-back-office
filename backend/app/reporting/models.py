@@ -111,7 +111,8 @@ class ReportRecommendation(BaseModel):
     title: str
     description: str
     priority: str = "medium"  # high, medium, low
-    category: str = "performance"  # retention, optimization, operational, financial
+    category: str = "performance"  # performance, quality, governance, operational, strategic, compliance, audit
+    evidence_ids: list[str] = Field(default_factory=list)
 
 
 class ReportSection(BaseModel):
@@ -122,6 +123,7 @@ class ReportSection(BaseModel):
     charts: list[ChartDefinition] = Field(default_factory=list)
     rankings: list[ReportRanking] = Field(default_factory=list)
     callout: str | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
 
 
 class ExecutiveSummary(BaseModel):
@@ -129,6 +131,10 @@ class ExecutiveSummary(BaseModel):
     key_highlights: list[str] = Field(default_factory=list)
     critical_findings: list[str] = Field(default_factory=list)
     sentiment: str = "neutral"  # positive, neutral, cautionary
+    dataset_overview: str = ""
+    highlights: list[str] = Field(default_factory=list)
+    overall: str = ""
+    evidence_ids: list[str] = Field(default_factory=list)
 
 
 class ReportTypeStatus(BaseModel):

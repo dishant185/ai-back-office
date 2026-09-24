@@ -11,16 +11,32 @@ router = APIRouter()
 
 @router.get("/status")
 async def get_ai_status() -> dict[str, Any]:
-    """Return external AI provider status."""
-    from app.ai.providers.factory import LLMProviderFactory
-    prov = LLMProviderFactory.get_provider()
+    """Return external AI provider connectivity and health status (safe, no secrets)."""
+    from app.ai.provider import get_llm_provider
+    prov = get_llm_provider()
+    
+    # Check health safely without generating full report
+    try:
+        health_info = await prov.health_check(probe=False)
+        configured = health_info.get("status") != "unconfigured" and prov.provider_name() != "deterministic-fallback"
+        reachable = bool(health_info.get("connected", False))
+        error_status = health_info.get("details", {}).get("error")
+    except Exception as exc:
+        configured = False
+        reachable = False
+        error_status = str(exc)
+
     return {
+        "provider": prov.provider_name(),
+        "configured": configured,
+        "model": getattr(prov, "model", settings.llm_model),
+        "reachable": reachable,
+        "last_success": None,
+        "error_status": error_status,
         "enabled": settings.ai_enabled,
-        "provider": prov.__class__.__name__,
-        "model": prov.model_name,
-        "status": "connected" if prov.is_available() else "fallback",
-        "verified_grounding": True,
-        "architecture": "External LLM + Deterministic DuckDB/Pandas Analytics",
+        "claim_validation_enabled": settings.ai_claim_validation_enabled,
+        "prompt_version": settings.ai_report_prompt_version,
+        "architecture": "External LLM + Deterministic Columnar Analytics",
     }
 
 

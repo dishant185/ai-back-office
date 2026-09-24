@@ -1,43 +1,80 @@
-import './Auth.css'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 
-import {
-  ArrowRight,
-  Building,
-  Eye,
-  EyeOff,
-  Lock,
-  Mail,
-  Sparkles,
-  User,
-  Zap,
-  Shield,
-  Database,
-  ChevronRight,
-  Activity,
-  Layers,
-} from 'lucide-react'
-import { useState } from 'react'
+import { AuthError } from '../components/auth/AuthError'
+import { AuthInput } from '../components/auth/AuthInput'
+import { AuthShell } from '../components/auth/AuthShell'
+import { AuthSubmitButton } from '../components/auth/AuthSubmitButton'
+import { PasswordInput } from '../components/auth/PasswordInput'
 import { useAuth } from '../context/AuthContext'
 
-type Mode = 'login' | 'register'
+export type AuthMode = 'login' | 'register' | 'forgot'
 
 export default function Auth() {
-  const { login, register } = useAuth()
-  const [mode, setMode] = useState<Mode>('login')
+  const { login, register, isAuthenticated } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // Derive mode directly from current path
+  const mode: AuthMode =
+    location.pathname === '/register'
+      ? 'register'
+      : location.pathname === '/forgot-password'
+      ? 'forgot'
+      : 'login'
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [infoNotice, setInfoNotice] = useState('')
 
   // Form fields
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [name, setName] = useState('')
-  const [department, setDepartment] = useState('')
   const [organization, setOrganization] = useState('')
+
+  // Update browser document title
+  useEffect(() => {
+    if (mode === 'login') {
+      document.title = 'Novera — Sign in'
+    } else if (mode === 'register') {
+      document.title = 'Novera — Create workspace'
+    } else {
+      document.title = 'Novera — Reset password'
+    }
+  }, [mode])
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [isAuthenticated, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setInfoNotice('')
+
+    if (mode === 'forgot') {
+      // Truthful representation: backend has no self-service reset mailer
+      setInfoNotice(
+        'Self-service password reset is managed by your workspace administrator. Please request an access token reset from your administrator.'
+      )
+      return
+    }
+
+    if (mode === 'register' && password !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter your password.')
+      return
+    }
+
+    if (mode === 'register' && password.length < 6) {
+      setError('Password must be at least 6 characters long.')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -48,7 +85,6 @@ export default function Auth() {
           email,
           password,
           name,
-          department: department || undefined,
           organization: organization || undefined,
         })
       }
@@ -56,228 +92,251 @@ export default function Auth() {
       const message =
         err.response?.data?.detail ||
         err.message ||
-        'Something went wrong. Please try again.'
+        'The email or password could not be verified.'
       setError(message)
     } finally {
       setLoading(false)
     }
   }
 
-  const toggleMode = () => {
-    setMode(mode === 'login' ? 'register' : 'login')
+  const switchMode = (newMode: AuthMode) => {
     setError('')
+    setInfoNotice('')
+    if (newMode === 'login') navigate('/login', { replace: true })
+    else if (newMode === 'register') navigate('/register', { replace: true })
+    else if (newMode === 'forgot') navigate('/forgot-password', { replace: true })
   }
 
   return (
-    <div className="auth-page">
-      {/* Animated background */}
-      <div className="auth-bg">
-        <div className="auth-bg-orb auth-bg-orb--1" />
-        <div className="auth-bg-orb auth-bg-orb--2" />
-        <div className="auth-bg-orb auth-bg-orb--3" />
-        <div className="auth-bg-grid" />
-      </div>
-
-      <div className="auth-container">
-        {/* Left panel — Branding */}
-        <div className="auth-branding">
-          <div className="auth-branding-content">
-            <div className="auth-logo-row">
-              <div className="auth-logo-icon">
-                <Zap className="h-7 w-7 text-white" />
-              </div>
-              <div>
-                <h1 className="auth-logo-title">Back-Office</h1>
-                <p className="auth-logo-subtitle">AI COPILOT</p>
-              </div>
-            </div>
-
-            <h2 className="auth-hero-title">
-              Intelligent Data
-              <br />
-              <span className="auth-hero-accent">Operations Hub</span>
+    <AuthShell mode={mode}>
+      {/* LOGIN MODE */}
+      {mode === 'login' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="space-y-1">
+            <h2 className="font-sans text-2xl font-bold tracking-tight text-[#11181B] dark:text-[#EEF2EE]">
+              Welcome back
             </h2>
-
-            <p className="auth-hero-desc">
-              Transform raw data into actionable intelligence with AI-powered analytics,
-              automated column mapping, and comprehensive reporting — all secured per user.
+            <p className="text-xs text-[#66716C] dark:text-[#AAB5AF]">
+              Sign in to your Novera workspace.
             </p>
-
-            <div className="auth-features">
-              {[
-                { icon: Database, label: 'Smart Dataset Ingestion', desc: 'CSV & Excel auto-profiling' },
-                { icon: Layers, label: 'AI Column Mapping', desc: 'Intelligent field standardization' },
-                { icon: Activity, label: 'Analytics Reports', desc: 'One-click deep insights' },
-                { icon: Shield, label: 'User-Isolated Data', desc: 'Enterprise-grade security' },
-              ].map(({ icon: Icon, label, desc }) => (
-                <div key={label} className="auth-feature-card">
-                  <div className="auth-feature-icon">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="auth-feature-label">{label}</p>
-                    <p className="auth-feature-desc">{desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
-          {/* Floating decorative elements */}
-          <div className="auth-deco-ring auth-deco-ring--1" />
-          <div className="auth-deco-ring auth-deco-ring--2" />
-        </div>
+          {/* Error Message */}
+          <AuthError message={error} />
 
-        {/* Right panel — Form */}
-        <div className="auth-form-panel">
-          <div className="auth-form-wrapper">
-            <div className="auth-form-header">
-              <div className="auth-form-badge">
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Enterprise Platform</span>
-              </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <AuthInput
+              label="Email"
+              type="email"
+              id="login-email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@company.com"
+              required
+              autoComplete="email"
+            />
 
-              <h2 className="auth-form-title">
-                {mode === 'login' ? 'Welcome back' : 'Create your account'}
-              </h2>
-              <p className="auth-form-subtitle">
-                {mode === 'login'
-                  ? 'Sign in to access your datasets and analytics'
-                  : 'Start transforming your data operations today'}
-              </p>
-            </div>
+            <PasswordInput
+              label="Password"
+              id="login-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••••"
+              required
+              autoComplete="current-password"
+              hint={
+                <button
+                  type="button"
+                  onClick={() => switchMode('forgot')}
+                  className="text-[11px] font-medium text-[#176B50] hover:text-[#2D8A68] dark:text-[#4FAF87] dark:hover:text-[#5EC498] hover:underline cursor-pointer"
+                >
+                  Forgot password
+                </button>
+              }
+            />
 
-            {error && (
-              <div className="auth-error">
-                <p>{error}</p>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="auth-form">
-              {mode === 'register' && (
-                <div className="auth-field">
-                  <label className="auth-label" htmlFor="auth-name">Full Name</label>
-                  <div className="auth-input-wrap">
-                    <User className="auth-input-icon" />
-                    <input
-                      id="auth-name"
-                      type="text"
-                      className="auth-input"
-                      placeholder="Enter your full name"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      required
-                      minLength={2}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="auth-field">
-                <label className="auth-label" htmlFor="auth-email">Email Address</label>
-                <div className="auth-input-wrap">
-                  <Mail className="auth-input-icon" />
-                  <input
-                    id="auth-email"
-                    type="email"
-                    className="auth-input"
-                    placeholder="you@company.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="auth-field">
-                <label className="auth-label" htmlFor="auth-password">Password</label>
-                <div className="auth-input-wrap">
-                  <Lock className="auth-input-icon" />
-                  <input
-                    id="auth-password"
-                    type={showPassword ? 'text' : 'password'}
-                    className="auth-input"
-                    placeholder={mode === 'register' ? 'Min 6 characters' : 'Enter your password'}
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                  <button
-                    type="button"
-                    className="auth-eye-btn"
-                    onClick={() => setShowPassword(!showPassword)}
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {mode === 'register' && (
-                <div className="auth-field-row">
-                  <div className="auth-field">
-                    <label className="auth-label" htmlFor="auth-dept">Department</label>
-                    <div className="auth-input-wrap">
-                      <Building className="auth-input-icon" />
-                      <input
-                        id="auth-dept"
-                        type="text"
-                        className="auth-input"
-                        placeholder="e.g. Operations"
-                        value={department}
-                        onChange={e => setDepartment(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="auth-field">
-                    <label className="auth-label" htmlFor="auth-org">Organization</label>
-                    <div className="auth-input-wrap">
-                      <Building className="auth-input-icon" />
-                      <input
-                        id="auth-org"
-                        type="text"
-                        className="auth-input"
-                        placeholder="e.g. Acme Corp"
-                        value={organization}
-                        onChange={e => setOrganization(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="auth-submit"
-                disabled={loading}
+            <div className="pt-1">
+              <AuthSubmitButton
+                loading={loading}
+                loadingText="Signing in..."
               >
-                {loading ? (
-                  <span className="auth-spinner" />
-                ) : (
-                  <>
-                    <span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            <div className="auth-divider">
-              <span className="auth-divider-line" />
-              <span className="auth-divider-text">
-                {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}
-              </span>
-              <span className="auth-divider-line" />
+                Sign in
+              </AuthSubmitButton>
             </div>
+          </form>
 
-            <button type="button" className="auth-toggle" onClick={toggleMode}>
-              <span>{mode === 'login' ? 'Create a new account' : 'Sign in instead'}</span>
-              <ChevronRight className="h-4 w-4" />
+          {/* Secondary Action */}
+          <div className="pt-4 border-t border-[#C7CEC8] dark:border-[#2B3538] text-center">
+            <p className="text-xs text-[#66716C] dark:text-[#AAB5AF]">
+              Don&apos;t have a Novera workspace?{' '}
+              <button
+                type="button"
+                onClick={() => switchMode('register')}
+                className="font-semibold text-[#176B50] hover:text-[#2D8A68] dark:text-[#4FAF87] dark:hover:text-[#5EC498] hover:underline cursor-pointer ml-1"
+              >
+                Create workspace
+              </button>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* REGISTER MODE */}
+      {mode === 'register' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="space-y-1">
+            <h2 className="font-sans text-2xl font-bold tracking-tight text-[#11181B] dark:text-[#EEF2EE]">
+              Create your workspace
+            </h2>
+            <p className="text-xs text-[#66716C] dark:text-[#AAB5AF]">
+              Start organizing your business data in one verified workspace.
+            </p>
+          </div>
+
+          {/* Error Message */}
+          <AuthError message={error} />
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
+            <AuthInput
+              label="Full name"
+              type="text"
+              id="register-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Eleanor Vance"
+              required
+              autoComplete="name"
+            />
+
+            <AuthInput
+              label="Company / Workspace name"
+              type="text"
+              id="register-org"
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              placeholder="e.g. Acme Enterprises"
+              autoComplete="organization"
+            />
+
+            <AuthInput
+              label="Email"
+              type="email"
+              id="register-email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@company.com"
+              required
+              autoComplete="email"
+            />
+
+            <PasswordInput
+              label="Password"
+              id="register-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minimum 6 characters"
+              required
+              autoComplete="new-password"
+            />
+
+            <PasswordInput
+              label="Confirm password"
+              id="register-confirm-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter your password"
+              required
+              autoComplete="new-password"
+            />
+
+            <div className="pt-2">
+              <AuthSubmitButton
+                loading={loading}
+                loadingText="Creating workspace..."
+              >
+                Create workspace
+              </AuthSubmitButton>
+            </div>
+          </form>
+
+          {/* Secondary Action */}
+          <div className="pt-4 border-t border-[#C7CEC8] dark:border-[#2B3538] text-center">
+            <p className="text-xs text-[#66716C] dark:text-[#AAB5AF]">
+              Already have a workspace?{' '}
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className="font-semibold text-[#176B50] hover:text-[#2D8A68] dark:text-[#4FAF87] dark:hover:text-[#5EC498] hover:underline cursor-pointer ml-1"
+              >
+                Sign in
+              </button>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* FORGOT PASSWORD MODE */}
+      {mode === 'forgot' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="space-y-1">
+            <h2 className="font-sans text-2xl font-bold tracking-tight text-[#11181B] dark:text-[#EEF2EE]">
+              Reset your password
+            </h2>
+            <p className="text-xs text-[#66716C] dark:text-[#AAB5AF]">
+              Enter your account email and we&apos;ll guide you through the password reset process.
+            </p>
+          </div>
+
+          {/* Info/Notice */}
+          {infoNotice && (
+            <div className="rounded-[2px] border border-[#A8792E]/30 bg-[#A8792E]/10 p-3 text-xs text-[#A8792E] dark:text-[#D0A45C]">
+              {infoNotice}
+            </div>
+          )}
+
+          {/* Error Message */}
+          <AuthError message={error} />
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <AuthInput
+              label="Email"
+              type="email"
+              id="forgot-email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@company.com"
+              required
+              autoComplete="email"
+            />
+
+            <div className="pt-1">
+              <AuthSubmitButton
+                loading={loading}
+                loadingText="Sending reset instructions..."
+              >
+                Send reset instructions
+              </AuthSubmitButton>
+            </div>
+          </form>
+
+          {/* Secondary Action */}
+          <div className="pt-4 border-t border-[#C7CEC8] dark:border-[#2B3538] text-center">
+            <button
+              type="button"
+              onClick={() => switchMode('login')}
+              className="text-xs font-semibold text-[#176B50] hover:text-[#2D8A68] dark:text-[#4FAF87] dark:hover:text-[#5EC498] hover:underline cursor-pointer"
+            >
+              Back to sign in
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      )}
+    </AuthShell>
   )
 }

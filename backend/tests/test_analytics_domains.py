@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from app.analytics.domains.hr import HRAnalytics
-from app.analytics.domains.sales import SalesAnalytics
+from app.analytics.engine import UniversalAnalyticsEngine
+from app.analytics.derived_metrics import calculate_financial_lineage, calculate_attrition_rate
 
 
 def test_sales_domain_metrics() -> None:
@@ -18,13 +18,14 @@ def test_sales_domain_metrics() -> None:
         }
     )
 
-    result = SalesAnalytics().analyze(frame)
+    engine = UniversalAnalyticsEngine(frame)
+    fin = calculate_financial_lineage(frame)
 
-    assert result["total_revenue"] == 4500.0
-    assert result["total_profit"] == 900.0
-    assert result["total_quantity"] == 7
-    assert result["top_region"] == "North"
-    assert result["profit_margin"] > 0.19
+    assert engine.sum("revenue") == 4500.0
+    assert engine.sum("profit") == 900.0
+    assert engine.sum("quantity") == 7
+    assert engine.top_n("region", measure="revenue", n=1)[0]["label"] == "North"
+    assert fin["net_margin"].value > 19.0
 
 
 def test_hr_domain_metrics() -> None:
@@ -40,9 +41,10 @@ def test_hr_domain_metrics() -> None:
         }
     )
 
-    result = HRAnalytics().analyze(frame)
+    engine = UniversalAnalyticsEngine(frame)
+    att_rate, left_cnt, _ = calculate_attrition_rate(frame)
 
-    assert result["employee_count"] == 3
-    assert result["average_age"] == 27.666666666666668
-    assert result["attrition_rate"] == 0.3333333333333333
-    assert result["top_city"] == "Bangalore"
+    assert engine.count("employee_name") == 3
+    assert abs(engine.mean("age") - 27.67) < 0.01
+    assert round(att_rate, 2) == 33.33
+    assert engine.top_n("city", n=1)[0]["label"] == "Bangalore"

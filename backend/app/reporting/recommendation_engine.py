@@ -97,16 +97,4 @@ class RecommendationEngine:
                 )
                 rec_counter += 1
 
-        # Fallback if no specific triggers fired
-        if not recommendations:
-            recommendations.append(
-                ReportRecommendation(
-                    id="rec_default_1",
-                    title="Continuous Canonical Baseline Tracking",
-                    description="Maintain regular scheduled refreshes of this dataset to track metric stability and identify early inflection signals.",
-                    priority="medium",
-                    category="governance",
-                )
-            )
-
         return recommendations[:4]

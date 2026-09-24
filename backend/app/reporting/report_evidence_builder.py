@@ -41,7 +41,11 @@ class ReportEvidenceBuilder:
             return "headcount", "count", None
         if "age" in combined:
             return "age", "years", None
-        if "tenure" in combined or "experience" in combined:
+        if "experience" in combined and "domain" in combined:
+            return "domain_experience", "years", None
+        if "experience" in combined:
+            return "experience", "years", None
+        if "tenure" in combined:
             return "tenure", "years", None
         if "missing" in combined:
             return "missing_values", "cells", None

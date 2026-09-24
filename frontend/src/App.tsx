@@ -1,8 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
+import { queryClient } from './lib/queryClient'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
+import { NoveraLogo } from './components/brand/NoveraLogo'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ToastProvider } from './context/ToastContext'
@@ -14,27 +16,18 @@ import MappingPage from './pages/Mapping'
 import Profile from './pages/Profile'
 import Reports from './pages/Reports'
 import UploadPage from './pages/Upload'
+import DatasetWorkspace from './pages/DatasetWorkspace'
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-})
+
 
 function LoadingScreen() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-novera-ink text-slate-100 font-sans">
+    <div className="flex min-h-screen items-center justify-center bg-[#11181B] text-[#EEF2EE] font-sans">
       <div className="flex flex-col items-center gap-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-[2px] bg-novera-deep border border-white/20 font-mono text-base font-bold text-novera-green-light">
-          N
-        </div>
+        <NoveraLogo variant="mark" size="md" />
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 animate-spin border-2 border-novera-green/30 border-t-novera-green rounded-full" />
-          <p className="text-xs font-mono text-novera-muted tracking-tight">Initializing Novera Ledger...</p>
+          <div className="h-3 w-3 animate-spin border-2 border-[#176B50]/30 border-t-[#4FAF87] rounded-full" />
+          <p className="text-xs font-mono text-[#66716C] tracking-tight">Initializing Novera Ledger...</p>
         </div>
       </div>
     </div>
@@ -71,6 +64,18 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/register"
+        element={
+          isAuthenticated ? <Navigate to="/dashboard" replace /> : <Auth />
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          isAuthenticated ? <Navigate to="/dashboard" replace /> : <Auth />
+        }
+      />
+      <Route
         path="/"
         element={
           <ProtectedRoute>
@@ -96,6 +101,26 @@ function AppRoutes() {
           <ProtectedRoute>
             <DashboardLayout>
               <UploadPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/workspace"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <DatasetWorkspace />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/workspace/:datasetId"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <DatasetWorkspace />
             </DashboardLayout>
           </ProtectedRoute>
         }
